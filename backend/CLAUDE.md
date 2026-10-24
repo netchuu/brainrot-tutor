@@ -87,7 +87,7 @@ Gates and times come from `docs/PLAN.md`. Tick boxes here as you finish them.
 
 ### M1 Hello pipeline (Day 1, 13:00)
 - [ ] `script_writer`: source text → validated episode script (Gemini), grounding checks pass on `contracts/fixtures/source.txt`
-- [ ] `narrator`: one line → MP3 base64 + word timings
+- [x] `narrator`: one line → MP3 base64 + word timings
 - [ ] `pictures`: Pexels search → url + credit
 
 ### M2 End to end (Day 1, 18:00) — the key gate
