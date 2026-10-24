@@ -73,13 +73,17 @@ def main() -> int:
     tutor = read_ndjson(FIXTURES / "tutor-stream.ndjson")
     for n, event in enumerate(tutor, start=1):
         check(errors, "TutorEvent", f"tutor-stream.ndjson line {n}", event)
+    grade = json.loads((FIXTURES / "grade.json").read_text(encoding="utf-8"))
+    check(errors, "GradeResponse", "grade.json", grade)
+    if not errors and grade["correct"] != (grade["score"] >= 0.6):
+        errors.append("grade.json: correct must equal score >= 0.6")
     if not errors:
         check_stream_order(errors, events)
         check_grounding(errors, normalize((FIXTURES / "source.txt").read_text(encoding="utf-8")), events, quiz, tutor)
     for error in errors:
         print(error, file=sys.stderr)
     scenes = sum(1 for e in events if e["type"] == "scene")
-    print(f"{'FAIL' if errors else 'OK'}: {len(events)} stream events ({scenes} scenes), {len(quiz['questions'])} quiz questions, {len(tutor)} tutor events, {len(errors)} errors")
+    print(f"{'FAIL' if errors else 'OK'}: {len(events)} stream events ({scenes} scenes), {len(quiz['questions'])} quiz questions, 1 grade, {len(tutor)} tutor events, {len(errors)} errors")
     return 1 if errors else 0
 
 

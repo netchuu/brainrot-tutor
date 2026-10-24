@@ -97,6 +97,11 @@ def test_quiz_fixture_round_trips() -> None:
     round_trip(TypeAdapter(contract.QuizResponse), "QuizResponse", quiz)
 
 
+def test_grade_fixture_round_trips() -> None:
+    grade = json.loads((FIXTURES_DIR / "grade.json").read_text(encoding="utf-8"))
+    round_trip(TypeAdapter(contract.GradeResponse), "GradeResponse", grade)
+
+
 @pytest.mark.parametrize("line", read_ndjson(FIXTURES_DIR / "tutor-stream.ndjson"), ids=lambda event: event["type"])
 def test_tutor_stream_fixture_round_trips(line: dict[str, Any]) -> None:
     round_trip(TypeAdapter(contract.TutorEvent), "TutorEvent", line)

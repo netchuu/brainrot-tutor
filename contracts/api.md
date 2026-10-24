@@ -101,6 +101,8 @@ The answer is included on purpose: grading single-choice happens in the browser.
 Request [`GradeRequest`]: `{"language": "ru", "question": <OpenQuestion>, "answer": "…"}`
 Response [`GradeResponse`]: `{"correct": true, "score": 0.8, "feedback": "…"}`. `correct` is `score >= 0.6`.
 
+Fixture: `fixtures/grade.json` is the response for the open question `q4` of `fixtures/quiz.json`.
+
 ## POST /api/tutor
 
 Request [`TutorRequest`]: source text, language, and the chat so far (`messages`, last one from `user`, at most 20).
