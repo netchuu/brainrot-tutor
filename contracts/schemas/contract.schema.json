@@ -1,0 +1,306 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brainrot-tutor.local/contract.schema.json",
+  "title": "Brainrot Tutor API contract",
+  "$defs": {
+    "Language": { "enum": ["ru", "en"] },
+    "TemplateId": { "enum": ["parkour_duo", "split_screen", "fake_chat", "top3_countdown", "myth_or_fact"] },
+    "Speaker": { "enum": ["teacher", "student"] },
+    "Reaction": { "enum": ["none", "mind_blown", "shocked", "laugh", "thinking", "fire", "check", "cross"] },
+    "Sfx": { "enum": ["none", "whoosh", "pop", "boom", "drumroll", "ding", "buzzer"] },
+    "ErrorCode": { "enum": ["bad_input", "too_long", "rate_limited", "llm_unavailable", "internal"] },
+
+    "Word": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "start_ms", "end_ms"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "start_ms": { "type": "integer", "minimum": 0 },
+        "end_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Audio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mime", "base64", "duration_ms"],
+      "properties": {
+        "mime": { "const": "audio/mpeg" },
+        "base64": { "type": "string", "minLength": 1 },
+        "duration_ms": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "Picture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["query", "url", "credit"],
+      "properties": {
+        "query": { "type": "string", "minLength": 1 },
+        "url": { "type": "string", "format": "uri" },
+        "credit": { "type": "string" }
+      }
+    },
+    "Scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "speaker", "text", "highlight", "words", "words_estimated", "audio", "picture", "formula", "term", "rank", "verdict", "reaction", "sfx", "source_quote"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^e[0-9]+s[0-9]+$" },
+        "speaker": { "$ref": "#/$defs/Speaker" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 220 },
+        "highlight": { "type": ["string", "null"] },
+        "words": { "type": "array", "items": { "$ref": "#/$defs/Word" }, "minItems": 1 },
+        "words_estimated": { "type": "boolean" },
+        "audio": { "oneOf": [{ "$ref": "#/$defs/Audio" }, { "type": "null" }] },
+        "picture": { "oneOf": [{ "$ref": "#/$defs/Picture" }, { "type": "null" }] },
+        "formula": { "type": ["string", "null"] },
+        "term": { "type": ["string", "null"] },
+        "rank": { "oneOf": [{ "type": "integer", "minimum": 1, "maximum": 3 }, { "type": "null" }] },
+        "verdict": { "enum": ["myth", "fact", null] },
+        "reaction": { "$ref": "#/$defs/Reaction" },
+        "sfx": { "$ref": "#/$defs/Sfx" },
+        "source_quote": { "type": ["string", "null"] }
+      }
+    },
+    "EpisodeOutline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "title", "template", "scene_count"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0 },
+        "title": { "type": "string", "minLength": 1 },
+        "template": { "$ref": "#/$defs/TemplateId" },
+        "scene_count": { "type": "integer", "minimum": 1, "maximum": 8 }
+      }
+    },
+
+    "PlanEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "course_title", "language", "episodes"],
+      "properties": {
+        "type": { "const": "plan" },
+        "course_title": { "type": "string", "minLength": 1 },
+        "language": { "$ref": "#/$defs/Language" },
+        "episodes": { "type": "array", "items": { "$ref": "#/$defs/EpisodeOutline" }, "minItems": 1, "maxItems": 3 }
+      }
+    },
+    "SceneEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "episode", "index", "scene"],
+      "properties": {
+        "type": { "const": "scene" },
+        "episode": { "type": "integer", "minimum": 0 },
+        "index": { "type": "integer", "minimum": 0 },
+        "scene": { "$ref": "#/$defs/Scene" }
+      }
+    },
+    "EpisodeDoneEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "episode"],
+      "properties": {
+        "type": { "const": "episode_done" },
+        "episode": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "DoneEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "elapsed_ms"],
+      "properties": {
+        "type": { "const": "done" },
+        "elapsed_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "ErrorEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "code", "message", "retryable"],
+      "properties": {
+        "type": { "const": "error" },
+        "code": { "$ref": "#/$defs/ErrorCode" },
+        "message": { "type": "string" },
+        "retryable": { "type": "boolean" }
+      }
+    },
+    "StreamEvent": {
+      "oneOf": [
+        { "$ref": "#/$defs/PlanEvent" },
+        { "$ref": "#/$defs/SceneEvent" },
+        { "$ref": "#/$defs/EpisodeDoneEvent" },
+        { "$ref": "#/$defs/DoneEvent" },
+        { "$ref": "#/$defs/ErrorEvent" }
+      ]
+    },
+
+    "EpisodesRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_text", "language"],
+      "properties": {
+        "source_text": { "type": "string", "minLength": 200, "maxLength": 60000 },
+        "language": { "$ref": "#/$defs/Language" },
+        "episode_count": { "type": "integer", "minimum": 1, "maximum": 3, "default": 3 },
+        "template": { "oneOf": [{ "$ref": "#/$defs/TemplateId" }, { "type": "null" }], "default": null }
+      }
+    },
+
+    "QuizSceneRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "source_quote"],
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "source_quote": { "type": ["string", "null"] }
+      }
+    },
+    "QuizRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_text", "language", "episode"],
+      "properties": {
+        "source_text": { "type": "string", "minLength": 200, "maxLength": 60000 },
+        "language": { "$ref": "#/$defs/Language" },
+        "question_count": { "type": "integer", "minimum": 3, "maximum": 5, "default": 4 },
+        "episode": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["index", "title", "scenes"],
+          "properties": {
+            "index": { "type": "integer", "minimum": 0 },
+            "title": { "type": "string" },
+            "scenes": { "type": "array", "items": { "$ref": "#/$defs/QuizSceneRef" }, "minItems": 1 }
+          }
+        }
+      }
+    },
+    "SingleChoiceQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "prompt", "options", "answer_index", "explanation", "source_quote", "scene_id"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "single_choice" },
+        "prompt": { "type": "string", "minLength": 1 },
+        "options": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 4, "maxItems": 4 },
+        "answer_index": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "explanation": { "type": "string", "minLength": 1 },
+        "source_quote": { "type": "string", "minLength": 1 },
+        "scene_id": { "type": ["string", "null"] }
+      }
+    },
+    "OpenQuestion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "prompt", "reference_answer", "source_quote", "scene_id"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "const": "open" },
+        "prompt": { "type": "string", "minLength": 1 },
+        "reference_answer": { "type": "string", "minLength": 1 },
+        "source_quote": { "type": "string", "minLength": 1 },
+        "scene_id": { "type": ["string", "null"] }
+      }
+    },
+    "Question": {
+      "oneOf": [{ "$ref": "#/$defs/SingleChoiceQuestion" }, { "$ref": "#/$defs/OpenQuestion" }]
+    },
+    "QuizResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episode", "questions"],
+      "properties": {
+        "episode": { "type": "integer", "minimum": 0 },
+        "questions": { "type": "array", "items": { "$ref": "#/$defs/Question" }, "minItems": 3, "maxItems": 5 }
+      }
+    },
+    "GradeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["language", "question", "answer"],
+      "properties": {
+        "language": { "$ref": "#/$defs/Language" },
+        "question": { "$ref": "#/$defs/OpenQuestion" },
+        "answer": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "GradeResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["correct", "score", "feedback"],
+      "properties": {
+        "correct": { "type": "boolean" },
+        "score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "feedback": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "ChatMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "content"],
+      "properties": {
+        "role": { "enum": ["user", "assistant"] },
+        "content": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      }
+    },
+    "TutorRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_text", "language", "messages"],
+      "properties": {
+        "source_text": { "type": "string", "minLength": 200, "maxLength": 60000 },
+        "language": { "$ref": "#/$defs/Language" },
+        "messages": { "type": "array", "items": { "$ref": "#/$defs/ChatMessage" }, "minItems": 1, "maxItems": 20 }
+      }
+    },
+    "TutorDeltaEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "text"],
+      "properties": {
+        "type": { "const": "delta" },
+        "text": { "type": "string" }
+      }
+    },
+    "TutorDoneEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "source_quotes"],
+      "properties": {
+        "type": { "const": "done" },
+        "source_quotes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "TutorEvent": {
+      "oneOf": [{ "$ref": "#/$defs/TutorDeltaEvent" }, { "$ref": "#/$defs/TutorDoneEvent" }, { "$ref": "#/$defs/ErrorEvent" }]
+    },
+
+    "ErrorResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code", "message", "retryable"],
+          "properties": {
+            "code": { "$ref": "#/$defs/ErrorCode" },
+            "message": { "type": "string" },
+            "retryable": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "HealthResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": { "status": { "const": "ok" } }
+    }
+  }
+}

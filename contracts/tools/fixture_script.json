@@ -1,0 +1,34 @@
+{
+  "course_title": "Чип-тюнинг ЭБУ за 3 минуты",
+  "language": "ru",
+  "episodes": [
+    {
+      "title": "ЭБУ — мозг машины",
+      "template": "parkour_duo",
+      "scenes": [
+        {"speaker": "teacher", "text": "Представь, что у машины есть мозг. Он называется ЭБУ.", "highlight": "мозг", "picture_query": "car engine control unit", "picture_seed": "ecu-brain", "reaction": "mind_blown", "sfx": "whoosh", "source_quote": "Электронный блок управления (ЭБУ) — это компьютер, который управляет работой двигателя автомобиля."},
+        {"speaker": "student", "text": "Подожди, и что этот мозг вообще делает?", "highlight": "делает", "picture_query": null, "picture_seed": null, "reaction": "thinking", "sfx": "pop", "source_quote": null},
+        {"speaker": "teacher", "text": "Каждую миллисекунду он читает датчики и решает, сколько топлива впрыснуть.", "highlight": "миллисекунду", "picture_query": "car engine sensors", "picture_seed": "engine-sensors", "reaction": "fire", "sfx": "boom", "source_quote": "Каждую миллисекунду ЭБУ получает данные от датчиков: обороты двигателя, положение педали газа, температуру и количество воздуха на впуске."},
+        {"speaker": "teacher", "text": "А правила для этих решений записаны в таблицах. Их называют картами.", "highlight": "картами", "picture_query": "data table chart", "picture_seed": "ecu-maps", "reaction": "check", "sfx": "ding", "source_quote": "Правила, по которым ЭБУ принимает решения, записаны в таблицах — их называют картами (топливная карта, карта угла опережения зажигания)."}
+      ]
+    },
+    {
+      "title": "Прошивка и формула мощности",
+      "template": "split_screen",
+      "scenes": [
+        {"speaker": "teacher", "text": "Прошивка ЭБУ — это изменение карт ради мощности.", "highlight": "мощности", "term": "Чип-тюнинг = изменение карт ЭБУ", "reaction": "fire", "sfx": "whoosh", "source_quote": "Чип-тюнинг, или прошивка ЭБУ, — это изменение этих карт, чтобы получить больше мощности или крутящего момента."},
+        {"speaker": "teacher", "text": "Мощность считают так: момент умножить на обороты и поделить на 7023.", "highlight": "Мощность", "formula": "P = \\frac{M \\times n}{7023}", "reaction": "thinking", "sfx": "pop", "source_quote": "Мощность двигателя в лошадиных силах считают по формуле P = M × n / 7023, где M — крутящий момент в Н·м, а n — обороты в минуту."},
+        {"speaker": "teacher", "text": "Например, 200 ньютон-метров на 5000 оборотах дают примерно 142 лошадиные силы.", "highlight": "142", "formula": "P = \\frac{200 \\times 5000}{7023} \\approx 142", "reaction": "mind_blown", "sfx": "ding", "source_quote": "Мощность двигателя в лошадиных силах считают по формуле P = M × n / 7023, где M — крутящий момент в Н·м, а n — обороты в минуту."}
+      ]
+    },
+    {
+      "title": "Почему нельзя перестараться",
+      "template": "fake_chat",
+      "scenes": [
+        {"speaker": "student", "text": "Так давай выкрутим всё на максимум!", "highlight": "максимум", "picture_query": null, "picture_seed": null, "reaction": "fire", "sfx": "pop", "source_quote": null},
+        {"speaker": "teacher", "text": "Нельзя. Слишком агрессивная прошивка ведёт к детонации и перегреву.", "highlight": "детонации", "picture_query": "overheated car engine", "picture_seed": "engine-heat", "reaction": "shocked", "sfx": "buzzer", "source_quote": "Но у заводских настроек есть запас прочности: слишком агрессивная прошивка может привести к детонации и перегреву двигателя."},
+        {"speaker": "teacher", "text": "Поэтому сначала замеры на диностенде, потом прошивка, потом проверка датчиков.", "highlight": "диностенде", "picture_query": "dyno test car", "picture_seed": "dyno", "reaction": "check", "sfx": "ding", "source_quote": "Поэтому перед прошивкой снимают замеры на диностенде, а после — проверяют показания датчиков."}
+      ]
+    }
+  ]
+}

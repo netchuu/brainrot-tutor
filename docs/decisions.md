@@ -1,0 +1,14 @@
+# Decisions
+
+One line per decision: date · decision · why.
+
+- 2026-10-24 · Template-based video: our clips and layouts, AI fills slots · fast (seconds, not minutes), free, no copyright risk
+- 2026-10-24 · Browser plays layers live; no MP4 render to watch · first scene within 10 s; MP4 export is stretch only
+- 2026-10-24 · Separate `backend/` (FastAPI) and `frontend/` (Vite React) with a shared `contracts/` · two agents work in parallel against fixtures
+- 2026-10-24 · Stateless backend, no database; the client sends the source text with each call · nothing to host or migrate in 2 days
+- 2026-10-24 · Episodes stream as NDJSON over POST; audio inline as base64 MP3 · no storage service, scene 1 plays before the episode finishes
+- 2026-10-24 · PDF text is extracted in the browser (pdfjs-dist) · avoids Vercel's request size limit for file uploads; scanned PDFs are out of scope
+- 2026-10-24 · Gemini free tier (Flash-Lite) for script, quiz and tutor; Groq free tier as fallback · $0, two providers survive one rate limit
+- 2026-10-24 · Voice: edge-tts Svetlana for both characters with different pitch · Dmitry failed on some sentences in tests; no Kyrgyz voice
+- 2026-10-24 · Own React player instead of Remotion · Remotion's free license covers teams of up to 3
+- 2026-10-24 · Pictures from Pexels; no AI images in the live path · keyless AI images took ~9 s and allow 1 per 45 s
