@@ -237,7 +237,7 @@ async def test_ready_callback_gets_each_episode_final_scenes(monkeypatch: pytest
     assert len(ready[1]) == 2
 
 
-async def test_ai_cannot_choose_a_template_the_player_lacks(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_countdown_without_ranks_falls_back_to_parkour_duo(monkeypatch: pytest.MonkeyPatch) -> None:
     drafts = [draft.model_copy(update={"template": "top3_countdown"}) for draft in fixture_drafts()]
     fake = install(monkeypatch, FakeLlm(drafts))
 
@@ -327,3 +327,32 @@ async def test_unforced_template_choice(monkeypatch: pytest.MonkeyPatch, chosen:
     script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
 
     assert {episode.template for episode in script.episodes} == {expected}
+
+
+def with_slots(draft: EpisodeDraft, template: str, **per_scene: list[object]) -> EpisodeDraft:
+    scenes = [
+        scene.model_copy(update={field: values[index] for field, values in per_scene.items()})
+        for index, scene in enumerate(draft.scenes)
+    ]
+    return draft.model_copy(update={"template": template, "scenes": scenes})
+
+
+async def test_ai_can_choose_a_complete_countdown_and_myth_episode(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = fixture_drafts()
+    drafts[0] = with_slots(drafts[0], "top3_countdown", rank=[3, None, 2, 1])
+    drafts[2] = with_slots(drafts[2], "myth_or_fact", verdict=[None, "fact", "fact"])
+    install(monkeypatch, FakeLlm(drafts))
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert [episode.template for episode in script.episodes] == ["top3_countdown", "split_screen", "myth_or_fact"]
+    assert [scene.rank for scene in script.episodes[0].scenes] == [3, None, 2, 1]
+    assert [scene.verdict for scene in script.episodes[2].scenes] == [None, "fact", "fact"]
+
+
+async def test_forced_countdown_is_kept_even_without_ranks(monkeypatch: pytest.MonkeyPatch) -> None:
+    install(monkeypatch, FakeLlm(fixture_drafts()))
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, "top3_countdown")
+
+    assert {episode.template for episode in script.episodes} == {"top3_countdown"}

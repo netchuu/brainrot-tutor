@@ -5,13 +5,12 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from string import Template
-from typing import get_args
 
 from app.clients.llm import generate_json
 from app.config import PROMPTS_DIR
 from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import Language, TemplateId
-from app.schemas.script import AiTemplate, CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
+from app.schemas.script import CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
 from app.services.cache import LruCache, cache_key
 from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, defang, normalize, word_stems
 
@@ -23,12 +22,12 @@ REPAIR_PROMPT = Template((PROMPTS_DIR / "script_repair.md").read_text(encoding="
 LANGUAGE_NAMES: dict[Language, str] = {"ru": "Russian", "en": "English"}
 SCENES_MIN = 4
 SCENES_MAX = 6
-AI_TEMPLATES: tuple[AiTemplate, ...] = get_args(AiTemplate)
 CHOOSE_TEMPLATE = (
     "Choose the template that fits the SOURCE FRAGMENT best and put it in template: "
     "split_screen when it has a formula, a calculation or one central definition; "
-    "fake_chat for a story, a process or cause and effect; parkour_duo otherwise. "
-    "Only these three may be chosen."
+    "top3_countdown when it lists several facts, steps or reasons that can be ranked; "
+    "myth_or_fact when it corrects a common belief or states surprising true and false claims; "
+    "fake_chat for a story, a process or cause and effect; parkour_duo otherwise."
 )
 MAX_TERM_CHARS = 80
 SCRIPT_CACHE: LruCache[CourseScript] = LruCache(32)
@@ -130,6 +129,11 @@ async def write_episode(
             scenes[index] = replacement
     template = episode_template(draft, forced)
     kept = [fit_template(scene, template, fragment) for scene in scenes if scene is not None]
+    playable = playable_template(template, kept, forced)
+    if playable != template:
+        logger.info("episode %d: %s slots incomplete, using %s", episode, template, playable)
+        template = playable
+        kept = [fit_template(scene, template, fragment) for scene in kept]
     if not kept:
         logger.warning("episode %d: no grounded scenes left, dropping the episode", episode)
         return EpisodeOutcome(draft=None, degraded=degraded)
@@ -172,9 +176,19 @@ def fit_template(scene: ScriptScene, template: TemplateId, fragment: str) -> Scr
 
 
 def episode_template(draft: EpisodeDraft, forced: TemplateId | None) -> TemplateId:
+    return forced if forced is not None else draft.template
+
+
+def playable_template(template: TemplateId, scenes: list[ScriptScene], forced: TemplateId | None) -> TemplateId:
+    # A countdown needs ranks 3, 2 and 1 and a myth episode needs verdicts; a chosen template without them is swapped.
     if forced is not None:
-        return forced
-    return draft.template if draft.template in AI_TEMPLATES else "parkour_duo"
+        return template
+    ranks = sorted(scene.rank for scene in scenes if scene.rank is not None)
+    if template == "top3_countdown" and ranks != [1, 2, 3]:
+        return "parkour_duo"
+    if template == "myth_or_fact" and not any(scene.verdict for scene in scenes):
+        return "parkour_duo"
+    return template
 
 
 def template_rule(forced: TemplateId | None) -> str:

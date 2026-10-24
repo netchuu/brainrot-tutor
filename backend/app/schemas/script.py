@@ -1,11 +1,6 @@
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.contract import Language, Reaction, Sfx, Speaker, TemplateId, Verdict
-
-# Templates the AI may choose; the frontend plays these. A request can still force any TemplateId.
-AiTemplate = Literal["parkour_duo", "split_screen", "fake_chat"]
 
 
 class ScriptModel(BaseModel):
