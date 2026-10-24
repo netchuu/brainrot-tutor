@@ -2,11 +2,12 @@ import asyncio
 import json
 import logging
 import re
+from collections.abc import Callable
 from string import Template
 
 from app.clients.llm import generate_json
 from app.config import PROMPTS_DIR
-from app.errors import AppError, LlmUnavailableError, RateLimitedError
+from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import Language, TemplateId
 from app.schemas.script import CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
 from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, normalize
@@ -101,25 +102,48 @@ async def write_episode(system: str, fragment: str, episode: int, episode_count:
     return draft.model_copy(update={"scenes": kept})
 
 
+EpisodeReady = Callable[[int, list[ScriptScene]], None]
+
+
+async def attempt_episode(
+    system: str, fragment: str, number: int, count: int, on_ready: EpisodeReady | None
+) -> EpisodeDraft | RateLimitedError | LlmUnavailableError | None:
+    try:
+        draft = await write_episode(system, fragment, number, count)
+    except (RateLimitedError, LlmUnavailableError) as exc:
+        logger.warning("episode %d failed with %s, keeping the other episodes", number, exc.code)
+        return exc
+    if draft is not None and on_ready is not None:
+        on_ready(number, draft.scenes)
+    return draft
+
+
 async def write_script(
-    source_text: str, language: Language, episode_count: int, template: TemplateId | None
+    source_text: str,
+    language: Language,
+    episode_count: int,
+    template: TemplateId | None,
+    on_ready: EpisodeReady | None = None,
 ) -> CourseScript:
     fragments = split_source(source_text, episode_count)
     system = SYSTEM_PROMPT.substitute(
         language_name=LANGUAGE_NAMES[language], scenes_min=SCENES_MIN, scenes_max=SCENES_MAX
     )
-    try:
-        async with asyncio.TaskGroup() as group:
-            tasks = [
-                group.create_task(write_episode(system, fragment, index, len(fragments)))
-                for index, fragment in enumerate(fragments)
-            ]
-    except* AppError as failures:
-        raise failures.exceptions[0] from None
-    drafts = [draft for draft in (task.result() for task in tasks) if draft is not None]
-    if not drafts:
-        raise LlmUnavailableError("The AI could not write a lesson grounded in this text. Try again.")
+    async with asyncio.TaskGroup() as group:
+        tasks = [
+            group.create_task(attempt_episode(system, fragment, number, len(fragments), on_ready))
+            for number, fragment in enumerate(fragments)
+        ]
+    results = [task.result() for task in tasks]
     episodes = [
-        EpisodeScript(title=draft.title, template=template or DEFAULT_TEMPLATE, scenes=draft.scenes) for draft in drafts
+        EpisodeScript(number=number, title=result.title, template=template or DEFAULT_TEMPLATE, scenes=result.scenes)
+        for number, result in enumerate(results)
+        if isinstance(result, EpisodeDraft)
     ]
-    return CourseScript(course_title=drafts[0].course_title, language=language, episodes=episodes)
+    if not episodes:
+        failures = [result for result in results if isinstance(result, RateLimitedError | LlmUnavailableError)]
+        if failures:
+            raise failures[0]
+        raise LlmUnavailableError("The AI could not write a lesson grounded in this text. Try again.")
+    course_title = next(result.course_title for result in results if isinstance(result, EpisodeDraft))
+    return CourseScript(course_title=course_title, language=language, episodes=episodes)

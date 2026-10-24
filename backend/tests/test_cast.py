@@ -2,6 +2,7 @@ from typing import get_args
 
 from app.schemas.contract import CharacterId, TemplateId
 from app.services.cast import CHARACTER_VOICES, course_seed, pick_background, pick_cast, voice_for
+from build_fixtures import CHARACTER_VOICES as FIXTURE_VOICES
 from tests.conftest import SOURCE_TEXT
 
 
@@ -34,3 +35,10 @@ def test_split_screen_always_uses_the_satisfying_clip() -> None:
 def test_course_seed_is_stable_and_depends_on_the_text() -> None:
     assert course_seed(SOURCE_TEXT) == course_seed(SOURCE_TEXT)
     assert course_seed(SOURCE_TEXT) != course_seed(SOURCE_TEXT + " ")
+
+
+def test_fixture_generator_uses_the_same_russian_voices() -> None:
+    assert {
+        character: {"voice": voice.ru, "pitch": voice.pitch, "rate": voice.rate}
+        for character, voice in CHARACTER_VOICES.items()
+    } == FIXTURE_VOICES

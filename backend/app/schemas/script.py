@@ -28,6 +28,7 @@ class SceneFixes(ScriptModel):
 
 
 class EpisodeScript(ScriptModel):
+    number: int = Field(ge=0)
     title: str
     template: TemplateId
     scenes: list[ScriptScene] = Field(min_length=1, max_length=8)

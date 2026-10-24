@@ -9,8 +9,9 @@ import pytest
 from edge_tts.exceptions import NoAudioReceived
 
 from app.clients import tts
+from app.clients.tts import Boundary
 from app.services import narrator
-from app.services.narrator import estimate_words, narrate
+from app.services.narrator import estimate_words, narrate, words_from_boundaries
 
 LINE = "Представь, что у машины есть мозг."
 AUDIO = b"\xff\xf3" * 3000
@@ -124,3 +125,12 @@ def test_estimate_keeps_hyphenated_words_and_drops_punctuation() -> None:
     words = estimate_words("Ньютон-метры — это момент, а 7023 — делитель!", None)
 
     assert [word.text for word in words] == ["Ньютон-метры", "это", "момент", "а", "7023", "делитель"]
+
+
+def test_boundary_with_two_words_is_split_and_punctuation_dropped() -> None:
+    words = words_from_boundaries([Boundary("5000 оборотах", 100, 1300), Boundary("—", 1300, 1400)])
+
+    assert [(word.text, word.start_ms, word.end_ms) for word in words] == [
+        ("5000", 100, 500),
+        ("оборотах", 500, 1300),
+    ]

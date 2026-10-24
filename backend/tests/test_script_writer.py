@@ -205,3 +205,32 @@ async def test_repair_that_switches_speaker_is_rejected(monkeypatch: pytest.Monk
     script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
 
     assert teacher.text not in [scene.text for scene in script.episodes[1].scenes]
+
+
+async def test_one_failed_episode_keeps_the_others(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeLlm(fixture_drafts())
+
+    async def flaky(system: str, prompt: str, model: type[BaseModel]) -> BaseModel:
+        if "Episode 2 of 3." in prompt:
+            raise RateLimitedError("busy")
+        return await fake(system, prompt, model)
+
+    monkeypatch.setattr(script_writer, "generate_json", flaky)
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert [episode.number for episode in script.episodes] == [0, 2]
+
+
+async def test_ready_callback_gets_each_episode_final_scenes(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = fixture_drafts()
+    drafts[1] = with_scene(drafts[1], 0, source_quote="Прошивка всегда безопасна и удваивает мощность.")
+    install(monkeypatch, FakeLlm(drafts, fixes=[LlmUnavailableError("down")]))
+    ready: dict[int, list[str]] = {}
+
+    script = await script_writer.write_script(
+        SOURCE_TEXT, "ru", 3, None, lambda number, scenes: ready.update({number: [s.text for s in scenes]})
+    )
+
+    assert ready == {episode.number: [scene.text for scene in episode.scenes] for episode in script.episodes}
+    assert len(ready[1]) == 2

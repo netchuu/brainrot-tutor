@@ -3,7 +3,7 @@ import base64
 import logging
 from dataclasses import dataclass
 
-from app.clients.tts import synthesize
+from app.clients.tts import Boundary, synthesize
 from app.errors import VoiceError
 from app.schemas.contract import Audio, CharacterId, Language, Word
 from app.services.cast import voice_for
@@ -25,6 +25,21 @@ class Narration:
     audio: Audio | None
     words: list[Word]
     words_estimated: bool
+
+
+def words_from_boundaries(boundaries: list[Boundary]) -> list[Word]:
+    words: list[Word] = []
+    for boundary in boundaries:
+        # edge-tts sometimes reports two spoken words ("5000 оборотах") as one boundary; split it by length.
+        tokens = SPOKEN_WORD.findall(boundary.text)
+        span = boundary.end_ms - boundary.start_ms
+        total = sum(len(token) for token in tokens)
+        cursor = float(boundary.start_ms)
+        for token in tokens:
+            start = round(cursor)
+            cursor += span * len(token) / total
+            words.append(Word(text=token, start_ms=start, end_ms=round(cursor)))
+    return words
 
 
 def estimate_words(text: str, duration_ms: int | None) -> list[Word]:
@@ -49,12 +64,13 @@ async def narrate(text: str, character: CharacterId, language: Language) -> Narr
         async with asyncio.timeout(VOICE_SCENE_TIMEOUT_S):
             for attempt in range(1, VOICE_ATTEMPTS + 1):
                 try:
-                    mp3, words = await synthesize(text, voice, rate=rate, pitch=pitch)
+                    mp3, boundaries = await synthesize(text, voice, rate=rate, pitch=pitch)
                 except VoiceError as exc:
                     logger.warning("voice attempt %d of %d failed: %s", attempt, VOICE_ATTEMPTS, exc)
                     continue
                 duration_ms = max(1, round(len(mp3) / MP3_BYTES_PER_MS))
                 audio = Audio(mime="audio/mpeg", base64=base64.b64encode(mp3).decode("ascii"), duration_ms=duration_ms)
+                words = words_from_boundaries(boundaries)
                 if words:
                     return Narration(audio=audio, words=words, words_estimated=False)
                 return Narration(audio=audio, words=estimate_words(text, duration_ms), words_estimated=True)

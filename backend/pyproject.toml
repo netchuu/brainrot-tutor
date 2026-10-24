@@ -37,7 +37,7 @@ select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "BLE", "RUF", "N", "ANN", "FIX
 ban-relative-imports = "all"
 
 [tool.ruff.lint.isort]
-known-first-party = ["app", "tests", "validate"]
+known-first-party = ["app", "build_fixtures", "tests", "validate"]
 
 [tool.mypy]
 python_version = "3.12"

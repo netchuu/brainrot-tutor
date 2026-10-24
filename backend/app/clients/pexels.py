@@ -5,13 +5,14 @@ from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
 from app.errors import PictureError
+from app.schemas.contract import UriString
 
 PEXELS_SEARCH_URL = "https://api.pexels.com/v1/search"
 PEXELS_TIMEOUT_S = 5.0
 
 
 class PexelsSource(BaseModel):
-    large: str
+    large: UriString
 
 
 class PexelsPhoto(BaseModel):

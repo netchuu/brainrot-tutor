@@ -22,7 +22,7 @@ You own `backend/`. Before your first change read: the root `CLAUDE.md`, `contra
 - Absolute imports only (`from app.services.narrator import narrate_scene`); no relative imports; no imports inside functions
 - Type hints on every function and return; no `Any` unless a library forces it
 - No docstrings; a comment only for a non-obvious why, one line; no TODO or FIXME
-- Specific exceptions only, defined in `app/errors.py` (`LlmUnavailableError`, `RateLimitedError`, `SourceTooLongError`), each mapped to a contract `ErrorCode`; catch only what you handle
+- Specific exceptions only, defined in `app/errors.py` (`LlmUnavailableError`, `RateLimitedError`, `SourceTooLongError`), each mapped to a contract `ErrorCode`; catch only what you handle. One exception: the episode stream's last-resort handler logs any failure and ends the stream with an `internal` error event, because the status is already 200
 - Secrets only from env via `app/config.py`; never log keys or full source texts; never open `.env`
 
 ### Architecture
@@ -43,9 +43,9 @@ backend/
 
 ### Streaming and speed
 - `/api/episodes/stream` returns `StreamingResponse(..., media_type="application/x-ndjson")` and yields one event per line as soon as it is ready; never build a whole episode first
-- Event order exactly as `contracts/api.md`; voice and picture for all scenes of an episode run concurrently (`asyncio.TaskGroup`), emission stays in index order
+- Event order exactly as `contracts/api.md`; an episode's voices and pictures start as soon as its script is grounded and run concurrently (voice and picture of one scene in an `asyncio.TaskGroup`; scene tasks are plain tasks cancelled in `finally`, because a TaskGroup must not span a `yield`); emission stays in index order
 - Target: first `scene` event within 8 s for a 10-page text; log the time of every stage
-- Timeouts: LLM 30 s, voice 15 s per scene, Pexels 5 s
+- Timeouts: LLM 20 s per call, script stage 40 s, voice 15 s per scene, Pexels 5 s, whole stream 55 s (Vercel stops at 60 s; the stream ends with an `error` event instead)
 - Picture failure → `picture: null`. Voice failure → retry once → `audio: null`, `words_estimated: true`, timings estimated from word length
 
 ### LLM

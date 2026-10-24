@@ -48,9 +48,10 @@ async def test_first_photo_becomes_picture_with_credit(respx_mock: respx.MockRou
         httpx.Response(200, json={"photos": []}),
         httpx.Response(500, json={"error": "down"}),
         httpx.Response(200, json={"unexpected": True}),
+        httpx.Response(200, json={"photos": [{**PHOTO, "src": {"large": "/relative/path.jpeg"}}]}),
         httpx.ConnectTimeout("slow"),
     ],
-    ids=["no-result", "server-error", "bad-body", "timeout"],
+    ids=["no-result", "server-error", "bad-body", "relative-url", "timeout"],
 )
 async def test_failures_give_no_picture(respx_mock: respx.MockRouter, reply: httpx.Response | Exception) -> None:
     route = respx_mock.get(**PEXELS_ROUTE)
