@@ -7,7 +7,7 @@ from edge_tts.exceptions import EdgeTTSException
 from app.errors import VoiceError
 from app.schemas.contract import Word
 
-VOICE_TIMEOUT_S = 15
+VOICE_TIMEOUT_S = 8
 TICKS_PER_MS = 10_000
 
 

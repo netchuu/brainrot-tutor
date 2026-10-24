@@ -1,3 +1,5 @@
+import asyncio
+
 import httpx
 from pydantic import BaseModel, ValidationError
 
@@ -26,14 +28,15 @@ async def search_photo(query: str) -> PexelsPhoto | None:
     if api_key is None:
         return None
     try:
-        async with httpx.AsyncClient(timeout=PEXELS_TIMEOUT_S) as client:
+        # httpx timeouts apply per phase, so a wall-clock limit caps the whole call.
+        async with asyncio.timeout(PEXELS_TIMEOUT_S), httpx.AsyncClient(timeout=PEXELS_TIMEOUT_S) as client:
             response = await client.get(
                 PEXELS_SEARCH_URL,
                 params={"query": query, "per_page": 1},
                 headers={"Authorization": api_key.get_secret_value()},
             )
             response.raise_for_status()
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, TimeoutError) as exc:
         raise PictureError(f"Pexels search failed: {type(exc).__name__}") from exc
     try:
         result = PexelsSearch.model_validate_json(response.content)

@@ -192,3 +192,41 @@ async def test_provider_error_surfaces_as_app_error(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(RateLimitedError):
         await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+
+async def test_teacher_line_without_quote_is_repaired(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = fixture_drafts()
+    original = drafts[0].scenes[2]
+    drafts[0] = with_scene(drafts[0], 2, source_quote=None)
+    fake = install(monkeypatch, FakeLlm(drafts, fixes=[SceneFixes(scenes=[original])]))
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert sum(model is SceneFixes for _, _, model in fake.calls) == 1
+    assert script.episodes[0].scenes[2].source_quote == original.source_quote
+
+
+async def test_repair_that_drops_the_quote_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = fixture_drafts()
+    invented = "Чем агрессивнее прошивка, тем дольше живёт двигатель."
+    student = drafts[2].scenes[0].model_copy(update={"text": "Агрессивная прошивка продлевает жизнь мотору!"})
+    drafts[2] = with_scene(drafts[2], 0, text=student.text, source_quote=invented)
+    install(
+        monkeypatch, FakeLlm(drafts, fixes=[SceneFixes(scenes=[student.model_copy(update={"source_quote": None})])])
+    )
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert student.text not in [scene.text for scene in script.episodes[2].scenes]
+
+
+async def test_repair_that_switches_speaker_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = fixture_drafts()
+    teacher = drafts[1].scenes[0]
+    drafts[1] = with_scene(drafts[1], 0, source_quote="Прошивка всегда безопасна и удваивает мощность.")
+    as_student = teacher.model_copy(update={"speaker": "student", "source_quote": None})
+    install(monkeypatch, FakeLlm(drafts, fixes=[SceneFixes(scenes=[as_student])]))
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert teacher.text not in [scene.text for scene in script.episodes[1].scenes]

@@ -6,7 +6,7 @@ from string import Template
 
 from app.clients.llm import generate_json
 from app.config import PROMPTS_DIR
-from app.errors import AppError, LlmUnavailableError
+from app.errors import AppError, LlmUnavailableError, RateLimitedError
 from app.schemas.contract import Language, TemplateId
 from app.schemas.script import CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
 from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, normalize
@@ -63,15 +63,22 @@ async def repair_scenes(
     )
     try:
         fixes = await generate_json(system, prompt, SceneFixes)
-    except AppError as exc:
+    except (RateLimitedError, LlmUnavailableError) as exc:
         logger.warning("episode %d: repair call failed (%s), dropping %d scenes", episode, exc.code, len(failing))
         return [None] * len(failing)
     if len(fixes.scenes) != len(failing):
         logger.warning("episode %d: repair returned %d scenes for %d", episode, len(fixes.scenes), len(failing))
         return [None] * len(failing)
     source = GroundedSource(fragment)
-    rechecked = [check_scene(scene, source) for scene in fixes.scenes]
-    return [check.scene if not check.problems else None for check in rechecked]
+    repaired: list[ScriptScene | None] = []
+    for (original, _), scene in zip(failing, fixes.scenes, strict=True):
+        check = check_scene(scene, source)
+        # A repair may not escape grounding by switching speaker or dropping a quote the line had.
+        dodged = check.scene.speaker != original.speaker or (
+            bool(original.source_quote) and check.scene.source_quote is None
+        )
+        repaired.append(None if check.problems or dodged else check.scene)
+    return repaired
 
 
 async def write_episode(system: str, fragment: str, episode: int, episode_count: int) -> EpisodeDraft | None:

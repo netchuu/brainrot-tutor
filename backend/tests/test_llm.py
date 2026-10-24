@@ -1,3 +1,4 @@
+import asyncio
 import json
 
 import httpx
@@ -5,6 +6,7 @@ import pytest
 import respx
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.clients import llm
 from app.clients.llm import generate_json
 from app.config import get_settings
 from app.errors import LlmUnavailableError, RateLimitedError
@@ -100,6 +102,7 @@ async def test_gemini_invalid_twice_falls_back_to_groq(respx_mock: respx.MockRou
     assert body["response_format"]["json_schema"]["strict"] is True
     assert body["response_format"]["json_schema"]["name"] == "Answer"
     assert body["messages"][0] == {"role": "system", "content": "system"}
+    assert "minLength" not in json.dumps(body["response_format"]["json_schema"]["schema"])
 
 
 @pytest.mark.usefixtures("llm_keys")
@@ -162,3 +165,34 @@ async def test_rate_limit_with_other_provider_unset_is_rate_limited(
 
     with pytest.raises(RateLimitedError):
         await generate_json("system", "prompt", Answer)
+
+
+@pytest.mark.usefixtures("llm_keys")
+async def test_slow_gemini_hits_wall_clock_limit_and_falls_back(
+    respx_mock: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def slow(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(1)
+        return gemini_reply('{"word": "поздно"}')
+
+    monkeypatch.setattr(llm, "LLM_TIMEOUT_S", 0.05)
+    respx_mock.post(**GEMINI_ROUTE).mock(side_effect=slow)
+    respx_mock.post(**GROQ_ROUTE).mock(return_value=groq_reply('{"word": "вовремя"}'))
+
+    assert await generate_json("system", "prompt", Answer) == Answer(word="вовремя")
+
+
+def test_groq_schema_keeps_structure_and_drops_limits() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"pattern": {"type": "string", "minLength": 1}, "items": {"type": "array", "minItems": 3}},
+        "required": ["pattern", "items"],
+        "anyOf": [{"maxLength": 4, "type": "string"}],
+    }
+
+    assert llm.without_limits(schema) == {
+        "type": "object",
+        "properties": {"pattern": {"type": "string"}, "items": {"type": "array"}},
+        "required": ["pattern", "items"],
+        "anyOf": [{"type": "string"}],
+    }

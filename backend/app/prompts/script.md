@@ -14,8 +14,8 @@ Episode:
 
 Each scene:
 - text: one spoken line, at most 200 characters, no emoji, no markdown, no stage directions. A voice reads it aloud exactly as written.
-- highlight: exactly one word copied from text with the same spelling: the key term of the line.
-- source_quote: one complete sentence copied character for character from the SOURCE FRAGMENT that proves the line. Do not shorten, translate, merge or rephrase it. Use null only for a student question or a joke that states no fact.
+- highlight: exactly one word copied from text with the same spelling: the key term of the line. One word only, never a phrase.
+- source_quote: one complete sentence copied character for character from the SOURCE FRAGMENT that proves the line. Do not shorten, translate, merge or rephrase it. Every teacher line needs one. Use null only for a student question or a student joke that states no fact.
 - picture_query: 2 to 4 English words for a stock-photo search that illustrates the line, or null when no photo fits.
 - reaction: the sticker that pops in, one of none, mind_blown, shocked, laugh, thinking, fire, check, cross.
 - sfx: the sound at the start of the scene, one of none, whoosh, pop, boom, drumroll, ding, buzzer.

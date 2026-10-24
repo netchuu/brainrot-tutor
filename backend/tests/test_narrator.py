@@ -9,6 +9,7 @@ import pytest
 from edge_tts.exceptions import NoAudioReceived
 
 from app.clients import tts
+from app.services import narrator
 from app.services.narrator import estimate_words, narrate
 
 LINE = "Представь, что у машины есть мозг."
@@ -93,6 +94,18 @@ async def test_voice_timeout_counts_as_failure(monkeypatch: pytest.MonkeyPatch) 
 
     assert narration.audio is None
     assert len(FakeCommunicate.created) == 2
+
+
+async def test_both_attempts_share_one_scene_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tts, "VOICE_TIMEOUT_S", 10)
+    monkeypatch.setattr(narrator, "VOICE_SCENE_TIMEOUT_S", 0.05)
+    FakeCommunicate.delay_s = 1.0
+
+    narration = await narrate(LINE, "teacher", "ru")
+
+    assert narration.audio is None
+    assert narration.words_estimated is True
+    assert len(FakeCommunicate.created) == 1
 
 
 async def test_audio_without_boundaries_gets_estimated_timings() -> None:

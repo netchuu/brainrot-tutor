@@ -1,7 +1,10 @@
+import asyncio
+
 import httpx
 import pytest
 import respx
 
+from app.clients import pexels
 from app.config import get_settings
 from app.services.pictures import find_picture
 from validate import validator
@@ -55,6 +58,18 @@ async def test_failures_give_no_picture(respx_mock: respx.MockRouter, reply: htt
         route.mock(side_effect=reply)
     else:
         route.mock(return_value=reply)
+
+    assert await find_picture("dyno test car") is None
+
+
+@pytest.mark.usefixtures("pexels_key")
+async def test_slow_pexels_hits_wall_clock_limit(respx_mock: respx.MockRouter, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def slow(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(1)
+        return httpx.Response(200, json={"photos": [PHOTO]})
+
+    monkeypatch.setattr(pexels, "PEXELS_TIMEOUT_S", 0.05)
+    respx_mock.get(**PEXELS_ROUTE).mock(side_effect=slow)
 
     assert await find_picture("dyno test car") is None
 

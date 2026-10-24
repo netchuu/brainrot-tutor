@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -21,7 +22,25 @@ from app.errors import (
 logger = logging.getLogger(__name__)
 
 LLM_TIMEOUT_S = 30
+# Groq strict mode documents only structural keywords; Pydantic checks these limits after the call anyway.
+GROQ_DROPPED_KEYWORDS = frozenset({"minLength", "maxLength", "minItems", "maxItems", "pattern"})
 ProviderCall = Callable[[str, str, dict[str, Any]], Awaitable[str]]
+
+
+def without_limits(schema: dict[str, Any]) -> dict[str, Any]:
+    stripped: dict[str, Any] = {}
+    for key, value in schema.items():
+        if key in GROQ_DROPPED_KEYWORDS:
+            continue
+        if key in ("properties", "$defs"):
+            stripped[key] = {name: without_limits(child) for name, child in value.items()}
+        elif isinstance(value, dict):
+            stripped[key] = without_limits(value)
+        elif isinstance(value, list):
+            stripped[key] = [without_limits(item) if isinstance(item, dict) else item for item in value]
+        else:
+            stripped[key] = value
+    return stripped
 
 
 async def call_gemini(system: str, prompt: str, schema: dict[str, Any]) -> str:
@@ -36,7 +55,7 @@ async def call_gemini(system: str, prompt: str, schema: dict[str, Any]) -> str:
     )
     try:
         # An explicit httpx client stops the SDK from switching to aiohttp, which edge-tts installs.
-        async with httpx.AsyncClient(timeout=LLM_TIMEOUT_S) as http:
+        async with asyncio.timeout(LLM_TIMEOUT_S), httpx.AsyncClient(timeout=LLM_TIMEOUT_S) as http:
             http_options = genai_types.HttpOptions(timeout=LLM_TIMEOUT_S * 1000, httpx_async_client=http)
             client = genai.Client(api_key=settings.gemini_api_key.get_secret_value(), http_options=http_options)
             response = await client.aio.models.generate_content(
@@ -46,7 +65,7 @@ async def call_gemini(system: str, prompt: str, schema: dict[str, Any]) -> str:
         if exc.code == 429:
             raise ProviderRateLimitedError("Gemini answered 429") from exc
         raise ProviderUnavailableError(f"Gemini answered {exc.code}") from exc
-    except httpx.TransportError as exc:
+    except (httpx.TransportError, TimeoutError) as exc:
         raise ProviderUnavailableError(f"Gemini request failed: {type(exc).__name__}") from exc
     if not response.text:
         raise ProviderUnavailableError("Gemini returned no text")
@@ -58,22 +77,27 @@ async def call_groq(system: str, prompt: str, schema: dict[str, Any]) -> str:
     if settings.groq_api_key is None:
         raise ProviderNotConfiguredError("GROQ_API_KEY is not set")
     try:
-        async with AsyncGroq(
-            api_key=settings.groq_api_key.get_secret_value(), timeout=LLM_TIMEOUT_S, max_retries=0
-        ) as client:
+        async with (
+            asyncio.timeout(LLM_TIMEOUT_S),
+            AsyncGroq(api_key=settings.groq_api_key.get_secret_value(), timeout=LLM_TIMEOUT_S, max_retries=0) as client,
+        ):
             completion = await client.chat.completions.create(
                 model=settings.groq_model,
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
                 response_format={
                     "type": "json_schema",
-                    "json_schema": {"name": schema.get("title", "response"), "schema": schema, "strict": True},
+                    "json_schema": {
+                        "name": schema.get("title", "response"),
+                        "schema": without_limits(schema),
+                        "strict": True,
+                    },
                 },
             )
     except APIStatusError as exc:
         if exc.status_code == 429:
             raise ProviderRateLimitedError("Groq answered 429") from exc
         raise ProviderUnavailableError(f"Groq answered {exc.status_code}") from exc
-    except APIConnectionError as exc:
+    except (APIConnectionError, TimeoutError) as exc:
         raise ProviderUnavailableError(f"Groq request failed: {type(exc).__name__}") from exc
     content = completion.choices[0].message.content if completion.choices else None
     if not content:
