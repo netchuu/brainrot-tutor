@@ -31,3 +31,8 @@ class QuestionFixes(QuizModel):
 class GradeDraft(QuizModel):
     score: float = Field(ge=0, le=1)
     feedback: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+class TutorDraft(QuizModel):
+    answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    source_quotes: list[str] = Field(max_length=5)

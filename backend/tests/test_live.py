@@ -9,15 +9,17 @@ from app.clients.llm import call_groq, generate_with
 from app.config import get_settings
 from app.schemas.contract import (
     CharacterId,
+    ChatMessage,
     EpisodesRequest,
     GradeRequest,
     OpenQuestion,
     QuizEpisode,
     QuizRequest,
     QuizSceneRef,
+    TutorRequest,
 )
 from app.schemas.script import EpisodeDraft
-from app.services import grader, pipeline, quiz_maker, script_writer
+from app.services import grader, pipeline, quiz_maker, script_writer, tutor
 from app.services.grounding import normalize
 from app.services.narrator import narrate
 from app.services.pictures import find_picture
@@ -154,3 +156,19 @@ async def test_live_grade_open_answer() -> None:
 
     assert result.correct is True
     print(f"\ngrade: {result.model_dump()}")
+
+
+async def test_live_tutor_answers_from_the_source() -> None:
+    require_llm_key()
+    request = TutorRequest(
+        source_text=SOURCE_TEXT,
+        language="ru",
+        messages=[ChatMessage(role="user", content="Зачем нужны замеры на диностенде?")],
+    )
+
+    events = [json.loads(line) async for line in tutor.stream_tutor(request)]
+
+    for event in events:
+        validator("TutorEvent").validate(event)
+    assert events[-1]["type"] == "done"
+    print(f"\ntutor: {''.join(e['text'] for e in events if e['type'] == 'delta')!r} {events[-1]}")
