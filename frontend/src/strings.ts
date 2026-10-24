@@ -92,6 +92,13 @@ export const ru = {
     title: (teacher: string, student: string) => `${teacher} и ${student}`,
     online: 'в сети',
   },
+  top3: {
+    title: 'ТОП-3',
+  },
+  myth: {
+    question: 'Миф или факт?',
+    verdicts: { myth: 'МИФ', fact: 'ФАКТ' },
+  },
   characters: {
     professor: 'Профессор',
     mechanic: 'Механик',

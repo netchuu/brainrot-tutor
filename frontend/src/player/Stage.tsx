@@ -101,8 +101,18 @@ export function CookingSticker({ title, caption }: { title?: string; caption?: s
   return (
     <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-[4cqw] px-[8cqw] text-center">
       {title !== undefined && <p className="text-outline text-[7cqw] leading-tight font-black">{title}</p>}
-      <div className="animate-pop rounded-[5cqw] bg-white px-[6cqw] py-[3cqw] text-[7cqw] font-black text-black shadow-2xl">
-        <span className="inline-block animate-pulse">🍳 {ru.stage.cooking}</span>
+      <div className="animate-pop flex items-center gap-[2cqw] rounded-[5cqw] bg-white px-[6cqw] py-[3cqw] text-[7cqw] font-black text-black shadow-2xl">
+        <span className="inline-block animate-bounce">🍳</span>
+        <span>{ru.stage.cooking}</span>
+        <span className="flex gap-[1cqw]" aria-hidden>
+          {[0, 1, 2].map((dot) => (
+            <span
+              key={dot}
+              className="animate-dot inline-block size-[2cqw] rounded-full bg-black"
+              style={{ animationDelay: `${String(dot * 150)}ms` }}
+            />
+          ))}
+        </span>
       </div>
       {caption !== undefined && <p className="text-[4.5cqw] font-bold text-white/90">{caption}</p>}
     </div>
