@@ -75,5 +75,8 @@ uv run --with jsonschema python contracts/tools/validate.py
 
 ## Git
 
-- Branches: `feat/backend/<slug>`, `feat/frontend/<slug>`. Small PRs to `main`.
+- Both agents share one checkout on `main`. Never create, switch or rebase branches here: it would change the other agent's files.
+- Commit only your own folder, limited by path so the other agent's staged files stay out: `git add backend && git commit -m "…" -- backend` (frontend: same with `frontend`).
+- If `git commit` fails on `index.lock`, the other agent is committing: wait a few seconds and retry. Never delete the lock file.
+- Commit after each milestone or green checkpoint; push only when the user asks.
 - Never force-push. Never commit `.env`, `node_modules/`, `.venv/` or generated MP4s.
