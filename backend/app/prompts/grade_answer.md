@@ -1,6 +1,17 @@
-QUESTION: $question
-REFERENCE ANSWER: $reference
-SOURCE QUOTE: $quote
+QUESTION:
+<<<
+$question
+>>>
+
+REFERENCE ANSWER:
+<<<
+$reference
+>>>
+
+SOURCE QUOTE:
+<<<
+$quote
+>>>
 
 ANSWER:
 <<<

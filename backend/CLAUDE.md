@@ -35,9 +35,10 @@ backend/
     main.py  config.py  errors.py
     api/        health.py  episodes.py  quiz.py  tutor.py
     schemas/    contract.py          Pydantic models, same names and fields as contracts/schemas
-    services/   script_writer.py  narrator.py  pictures.py  pipeline.py  quiz_maker.py  grader.py  tutor.py  grounding.py
+                script.py  quiz.py   LLM output models (validated, then grounded)
+    services/   script_writer.py  narrator.py  pictures.py  pipeline.py  quiz_maker.py  grader.py  tutor.py  grounding.py  cast.py  fixture_replay.py
     clients/    llm.py (Gemini, Groq fallback)  tts.py (edge-tts)  pexels.py
-    prompts/    script.md  quiz.md  grade.md  tutor.md
+    prompts/    script.md  script_episode.md  script_repair.md  quiz.md  quiz_episode.md  quiz_repair.md  grade.md  grade_answer.md  tutor.md
   tests/
 ```
 
@@ -95,8 +96,8 @@ Gates and times come from `docs/PLAN.md`. Tick boxes here as you finish them.
 - [ ] Deployed URL answers the frontend from a phone
 
 ### M3 Learning loop (Day 1 evening)
-- [ ] `POST /api/quiz`: 3–5 questions per episode, at most one open, each with `source_quote` and `scene_id`
-- [ ] `POST /api/quiz/grade`
+- [x] `POST /api/quiz`: 3–5 questions per episode, at most one open, each with `source_quote` and `scene_id`
+- [x] `POST /api/quiz/grade`
 
 ### M4 MVP complete (Day 2, 12:00)
 - [ ] `POST /api/tutor`: streaming answer only from the source, `done` lists the quotes used

@@ -1,3 +1,5 @@
+Write exactly $count questions.
+
 EPISODE "$title":
 $scenes
 

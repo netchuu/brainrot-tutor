@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.errors import BadInputError
 from app.schemas.contract import GradeRequest, GradeResponse, QuizRequest, QuizResponse
 from app.services.grader import grade_answer
 from app.services.grounding import require_usable_source
@@ -16,4 +17,6 @@ async def quiz(body: QuizRequest) -> QuizResponse:
 
 @router.post("/quiz/grade")
 async def grade(body: GradeRequest) -> GradeResponse:
+    if not body.answer.strip():
+        raise BadInputError("answer contains no text")
     return await grade_answer(body)

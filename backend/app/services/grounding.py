@@ -8,6 +8,8 @@ from app.schemas.script import ScriptScene
 
 MAX_TEXT_CHARS = 220
 MIN_QUOTE_CHARS = 20
+MIN_QUOTE_WORDS = 4
+MAX_QUOTE_CHARS = 500
 QUOTE_MATCH_RATIO = 0.9
 WHITESPACE = re.compile(r"\s+")
 SENTENCE_BREAK = re.compile(r"(?<=[.!?…])\s+")
@@ -16,6 +18,15 @@ SPOKEN_WORD = re.compile(r"\w+(?:[-'\u2019]\w+)*")
 
 def normalize(text: str) -> str:
     return WHITESPACE.sub(" ", text).strip()
+
+
+def defang(text: str) -> str:
+    # Client and source text sit inside <<< >>> fences in prompts, so they must not be able to close one.
+    return text.replace("<<<", "\u2039\u2039\u2039").replace(">>>", "\u203a\u203a\u203a")
+
+
+def is_proof_sized(quote: str) -> bool:
+    return MIN_QUOTE_CHARS <= len(quote) <= MAX_QUOTE_CHARS and len(SPOKEN_WORD.findall(quote)) >= MIN_QUOTE_WORDS
 
 
 def require_usable_source(source_text: str) -> None:
@@ -36,18 +47,20 @@ class GroundedSource:
     def __init__(self, text: str) -> None:
         self.text = normalize(text)
         self.sentences = [sentence for sentence in SENTENCE_BREAK.split(self.text) if sentence]
-        self.sentence_set = set(self.sentences)
+
+    def contains_words(self, candidate: str) -> bool:
+        return re.search(rf"(?<!\w){re.escape(candidate)}(?!\w)", self.text) is not None
 
     def snap_quote(self, quote: str) -> str | None:
+        # A quote must be long enough to prove a fact, short enough to be one statement, and cut at word boundaries.
         candidate = normalize(quote)
-        if not candidate:
+        if not is_proof_sized(candidate):
             return None
-        # A short fragment such as a single term proves nothing unless it is a whole source sentence.
-        if candidate in self.sentence_set or (len(candidate) >= MIN_QUOTE_CHARS and candidate in self.text):
+        if self.contains_words(candidate):
             return candidate
         # A near-verbatim quote (other quote marks, yo/ye spelling, dash type) is replaced by the real source sentence.
         best_ratio, best_sentence = 0.0, None
-        for sentence in self.sentences:
+        for sentence in (sentence for sentence in self.sentences if is_proof_sized(sentence)):
             matcher = SequenceMatcher(None, candidate, sentence, autojunk=False)
             if matcher.real_quick_ratio() < QUOTE_MATCH_RATIO or matcher.quick_ratio() < QUOTE_MATCH_RATIO:
                 continue

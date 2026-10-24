@@ -30,8 +30,9 @@ line-length = 120
 select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "BLE", "RUF", "N", "ANN", "FIX", "TID252", "PLC0415"]
 
 [tool.ruff.lint.per-file-ignores]
-# Tests use Russian fixture text, which the confusable-character rules misread as typos.
+# Russian text and patterns use Cyrillic letters, which the confusable-character rules misread as typos.
 "tests/**" = ["RUF001", "RUF003"]
+"app/services/quiz_maker.py" = ["RUF001"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

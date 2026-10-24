@@ -185,14 +185,18 @@ async def test_slow_gemini_hits_wall_clock_limit_and_falls_back(
 def test_groq_schema_keeps_structure_and_drops_limits() -> None:
     schema = {
         "type": "object",
-        "properties": {"pattern": {"type": "string", "minLength": 1}, "items": {"type": "array", "minItems": 3}},
-        "required": ["pattern", "items"],
+        "properties": {
+            "pattern": {"type": "string", "minLength": 1},
+            "items": {"type": "array", "minItems": 3},
+            "score": {"type": "number", "minimum": 0, "maximum": 1, "exclusiveMaximum": 2},
+        },
+        "required": ["pattern", "items", "score"],
         "anyOf": [{"maxLength": 4, "type": "string"}],
     }
 
     assert llm.without_limits(schema) == {
         "type": "object",
-        "properties": {"pattern": {"type": "string"}, "items": {"type": "array"}},
-        "required": ["pattern", "items"],
+        "properties": {"pattern": {"type": "string"}, "items": {"type": "array"}, "score": {"type": "number"}},
+        "required": ["pattern", "items", "score"],
         "anyOf": [{"type": "string"}],
     }

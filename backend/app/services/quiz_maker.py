@@ -1,7 +1,10 @@
+import asyncio
 import hashlib
 import json
 import logging
 import random
+import re
+import time
 from dataclasses import dataclass
 from string import Template
 
@@ -10,7 +13,7 @@ from app.config import PROMPTS_DIR
 from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import OpenQuestion, QuizRequest, QuizResponse, QuizSceneRef, SingleChoiceQuestion
 from app.schemas.quiz import DraftQuestion, QuestionFixes, QuizDraft
-from app.services.grounding import GroundedSource, normalize
+from app.services.grounding import GroundedSource, defang, normalize
 from app.services.script_writer import LANGUAGE_NAMES
 
 logger = logging.getLogger(__name__)
@@ -22,6 +25,19 @@ MIN_QUESTIONS = 3
 OPTION_COUNT = 4
 EXCERPT_RADIUS = 600
 FALLBACK_EXCERPT_CHARS = 4000
+# The request schema has no length limits on these fields, so the prompt caps what it forwards.
+PROMPT_SCENES = 12
+PROMPT_FIELD_CHARS = 600
+# Vercel stops the function at 60 s; a repair only starts while it can still finish in time.
+QUIZ_DEADLINE_S = 50
+REPAIR_CUTOFF_S = 25
+OPEN_NOTE = "\nAn open question is already in the quiz, so every rewritten question must be single_choice."
+POSITIONAL_OPTION = re.compile(
+    r"all of the above|none of the above|both of the above|all of these|none of these"
+    r"|(все|оба|обе|ни один|ничего)\W+(из\W+)?(вышеперечисленн|перечисленн|вариант|выше)",
+    re.IGNORECASE,
+)
+POSITIONAL_EXPLANATION = re.compile(r"\b(option|answer|вариант|ответ)\s+[abcdабвг1-4]\b", re.IGNORECASE)
 
 AnyQuestion = SingleChoiceQuestion | OpenQuestion
 
@@ -58,22 +74,40 @@ def shuffled(options: list[str], answer_index: int, prompt: str) -> tuple[list[s
     return [options[index] for index in order], order.index(answer_index)
 
 
+def single_choice_problems(draft: DraftQuestion, options: list[str], explanation: str) -> list[str]:
+    problems: list[str] = []
+    distinct = len({option.casefold() for option in options})
+    if len(options) != OPTION_COUNT or not all(options) or distinct != len(options):
+        problems.append("a single_choice question needs exactly 4 different, non-empty options")
+    if any(POSITIONAL_OPTION.search(option) for option in options):
+        problems.append("options are shuffled, so no option may refer to the others (all, both, none of the above)")
+    if draft.answer_index is None or not 0 <= draft.answer_index < OPTION_COUNT:
+        problems.append("answer_index must be 0, 1, 2 or 3")
+    if not explanation:
+        problems.append("a single_choice question needs an explanation")
+    elif POSITIONAL_EXPLANATION.search(explanation):
+        problems.append("options are shuffled, so the explanation must not name an option by letter or number")
+    return problems
+
+
 def check_question(
-    draft: DraftQuestion, source: GroundedSource, scene_ids: set[str], open_taken: bool
+    draft: DraftQuestion, source: GroundedSource, scene_ids: set[str], kept: list[AnyQuestion]
 ) -> QuestionCheck:
     problems: list[str] = []
     prompt = normalize(draft.prompt)
     if not prompt:
         problems.append("prompt is empty")
+    elif prompt.casefold() in {question.prompt.casefold() for question in kept}:
+        problems.append("this question repeats another one; ask about a different fact")
     quote = source.snap_quote(draft.source_quote)
     if quote is None:
-        problems.append("source_quote is not a sentence copied word for word from the SOURCE EXCERPT")
+        problems.append("source_quote is not one complete sentence copied word for word from the SOURCE EXCERPT")
     scene_id = draft.scene_id if draft.scene_id in scene_ids else None
     if draft.kind == "open":
         reference = normalize(draft.reference_answer or "")
         if not reference:
             problems.append("an open question needs a reference_answer")
-        if open_taken:
+        if any(question.kind == "open" for question in kept):
             problems.append("only one open question is allowed; make this a single_choice question")
         if problems or quote is None:
             return QuestionCheck(question=None, problems=problems)
@@ -83,16 +117,7 @@ def check_question(
         return QuestionCheck(question=question, problems=[])
     options = [normalize(option) for option in draft.options or []]
     explanation = normalize(draft.explanation or "")
-    if (
-        len(options) != OPTION_COUNT
-        or not all(options)
-        or len({option.casefold() for option in options}) != len(options)
-    ):
-        problems.append("a single_choice question needs exactly 4 different, non-empty options")
-    if draft.answer_index is None or not 0 <= draft.answer_index < OPTION_COUNT:
-        problems.append("answer_index must be 0, 1, 2 or 3")
-    if not explanation:
-        problems.append("a single_choice question needs an explanation")
+    problems += single_choice_problems(draft, options, explanation)
     if problems or quote is None or draft.answer_index is None:
         return QuestionCheck(question=None, problems=problems)
     ordered, answer_index = shuffled(options, draft.answer_index, prompt)
@@ -110,12 +135,13 @@ def check_question(
 
 
 def check_all(
-    drafts: list[DraftQuestion], source: GroundedSource, scene_ids: set[str], open_taken: bool
+    drafts: list[DraftQuestion], source: GroundedSource, scene_ids: set[str], kept: list[AnyQuestion]
 ) -> list[QuestionCheck]:
     checks: list[QuestionCheck] = []
     for draft in drafts:
-        check = check_question(draft, source, scene_ids, open_taken)
-        open_taken = open_taken or (check.question is not None and check.question.kind == "open")
+        check = check_question(draft, source, scene_ids, kept)
+        if check.question is not None:
+            kept.append(check.question)
         checks.append(check)
     return checks
 
@@ -127,41 +153,55 @@ def describe_failures(failing: list[tuple[DraftQuestion, list[str]]]) -> str:
     )
 
 
-async def repair_questions(
-    system: str, context: dict[str, str], failing: list[tuple[DraftQuestion, list[str]]]
-) -> list[DraftQuestion]:
-    prompt = REPAIR_PROMPT.substitute(context, count=len(failing), problems=describe_failures(failing))
-    try:
-        fixes = await generate_json(system, prompt, QuestionFixes)
-    except (RateLimitedError, LlmUnavailableError) as exc:
-        logger.warning("quiz repair call failed (%s), dropping %d questions", exc.code, len(failing))
-        return []
-    return fixes.questions[: len(failing)]
+def trimmed(kept: list[AnyQuestion], count: int) -> list[AnyQuestion]:
+    opens = [question for question in kept if question.kind == "open"][:1]
+    singles = [question for question in kept if question.kind == "single_choice"]
+    return singles[: count - len(opens)] + opens
 
 
-async def make_quiz(request: QuizRequest) -> QuizResponse:
+async def write_quiz(request: QuizRequest) -> QuizResponse:
+    started = time.perf_counter()
     source = GroundedSource(request.source_text)
     scenes = request.episode.scenes
     scene_ids = {scene.id for scene in scenes}
-    system = SYSTEM_PROMPT.substitute(language_name=LANGUAGE_NAMES[request.language], count=request.question_count)
+    system = SYSTEM_PROMPT.substitute(language_name=LANGUAGE_NAMES[request.language])
     context = {
-        "title": request.episode.title,
-        "scenes": "\n".join(f"- {scene.id}: {normalize(scene.text)}" for scene in scenes),
-        "excerpt": excerpt_for(source, scenes),
+        "title": defang(request.episode.title[:PROMPT_FIELD_CHARS]),
+        "scenes": "\n".join(
+            f"- {defang(scene.id[:20])}: {defang(normalize(scene.text)[:PROMPT_FIELD_CHARS])}"
+            for scene in scenes[:PROMPT_SCENES]
+        ),
+        "excerpt": defang(excerpt_for(source, scenes)),
     }
-    draft = await generate_json(system, QUIZ_PROMPT.substitute(context), QuizDraft)
-    checks = check_all(draft.questions, source, scene_ids, open_taken=False)
-    kept = [check.question for check in checks if check.question is not None]
+    draft = await generate_json(system, QUIZ_PROMPT.substitute(context, count=request.question_count), QuizDraft)
+    kept: list[AnyQuestion] = []
+    checks = check_all(draft.questions, source, scene_ids, kept)
     failing = [
         (question, check.problems) for question, check in zip(draft.questions, checks, strict=True) if check.problems
     ]
-    if failing and len(kept) < request.question_count:
+    repair_error: RateLimitedError | LlmUnavailableError | None = None
+    if failing and len(kept) < request.question_count and time.perf_counter() - started < REPAIR_CUTOFF_S:
         logger.info("quiz: %d of %d questions failed checks, repairing", len(failing), len(checks))
-        open_taken = any(question.kind == "open" for question in kept)
-        repaired = check_all(await repair_questions(system, context, failing), source, scene_ids, open_taken)
-        kept += [check.question for check in repaired if check.question is not None]
-    kept = sorted(kept[: request.question_count], key=lambda question: question.kind == "open")
-    if len(kept) < MIN_QUESTIONS:
+        note = OPEN_NOTE if any(question.kind == "open" for question in kept) else ""
+        prompt = REPAIR_PROMPT.substitute(context, note=note, problems=describe_failures(failing))
+        try:
+            fixes = await generate_json(system, prompt, QuestionFixes)
+            check_all(fixes.questions[: len(failing)], source, scene_ids, kept)
+        except (RateLimitedError, LlmUnavailableError) as exc:
+            logger.warning("quiz repair call failed with %s", exc.code)
+            repair_error = exc
+    questions = trimmed(kept, request.question_count)
+    if len(questions) < MIN_QUESTIONS:
+        if isinstance(repair_error, RateLimitedError):
+            raise repair_error
         raise LlmUnavailableError("The AI could not write a quiz grounded in this text. Try again.")
-    questions = [question.model_copy(update={"id": f"q{number}"}) for number, question in enumerate(kept, start=1)]
-    return QuizResponse(episode=request.episode.index, questions=questions)
+    numbered = [question.model_copy(update={"id": f"q{number}"}) for number, question in enumerate(questions, start=1)]
+    return QuizResponse(episode=request.episode.index, questions=numbered)
+
+
+async def make_quiz(request: QuizRequest) -> QuizResponse:
+    try:
+        async with asyncio.timeout(QUIZ_DEADLINE_S):
+            return await write_quiz(request)
+    except TimeoutError:
+        raise LlmUnavailableError("Writing the quiz took too long. Try again.") from None

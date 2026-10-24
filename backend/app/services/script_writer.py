@@ -10,7 +10,7 @@ from app.config import PROMPTS_DIR
 from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import Language, TemplateId
 from app.schemas.script import CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
-from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, normalize
+from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, defang, normalize
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ async def repair_scenes(
     system: str, fragment: str, episode: int, failing: list[tuple[ScriptScene, list[str]]]
 ) -> list[ScriptScene | None]:
     prompt = REPAIR_PROMPT.substitute(
-        episode_number=episode + 1, count=len(failing), problems=describe_failures(failing), fragment=fragment
+        episode_number=episode + 1, count=len(failing), problems=describe_failures(failing), fragment=defang(fragment)
     )
     try:
         fixes = await generate_json(system, prompt, SceneFixes)
@@ -83,7 +83,9 @@ async def repair_scenes(
 
 
 async def write_episode(system: str, fragment: str, episode: int, episode_count: int) -> EpisodeDraft | None:
-    prompt = EPISODE_PROMPT.substitute(episode_number=episode + 1, episode_count=episode_count, fragment=fragment)
+    prompt = EPISODE_PROMPT.substitute(
+        episode_number=episode + 1, episode_count=episode_count, fragment=defang(fragment)
+    )
     draft = await generate_json(system, prompt, EpisodeDraft)
     source = GroundedSource(fragment)
     checks = [check_scene(scene, source) for scene in draft.scenes]
