@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: #ffe14d;
+  --font-display: "Montserrat", "Rubik", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --animate-pop: pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  --animate-bob: bob 0.45s ease-in-out infinite alternate;
+  --animate-pan: pan 8s ease-in-out infinite alternate;
+
+  @keyframes pop {
+    0% {
+      opacity: 0;
+      scale: 0.2;
+      rotate: -12deg;
+    }
+    100% {
+      opacity: 1;
+      scale: 1;
+      rotate: 0deg;
+    }
+  }
+
+  @keyframes bob {
+    from {
+      translate: 0 0;
+    }
+    to {
+      translate: 0 -4%;
+    }
+  }
+
+  @keyframes pan {
+    from {
+      background-position: 0% 50%;
+    }
+    to {
+      background-position: 100% 50%;
+    }
+  }
+}
+
+@utility text-outline {
+  -webkit-text-stroke: 0.06em #000;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0.06em 0 #000,
+    0 0.12em 0.25em rgb(0 0 0 / 0.6);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #000;
+  color: #fff;
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
