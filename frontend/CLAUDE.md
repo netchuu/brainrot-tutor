@@ -87,16 +87,16 @@ Gates and times come from `docs/PLAN.md`. Tick boxes here as you finish them.
 - [ ] Deployed on Vercel; works on a phone against the deployed backend
 
 ### M3 Learning loop (Day 1 evening)
-- [ ] Quiz after each episode: single choice graded in the browser with explanation and source quote; open answer through `/api/quiz/grade`; a wrong answer offers "Replay this scene" (`scene_id`)
-- [ ] `SplitScreen` template (KaTeX formula, term card, picture; satisfying loop below)
+- [x] Quiz after each episode: single choice graded in the browser with explanation and source quote; open answer through `/api/quiz/grade`; a wrong answer offers "Replay this scene" (`scene_id`)
+- [x] `SplitScreen` template (KaTeX formula, term card, picture; satisfying loop below)
 
 ### M4 MVP complete (Day 2, 12:00)
-- [ ] `FakeChat` template
-- [ ] Tutor chat screen streaming `/api/tutor`, showing the source quotes it used
-- [ ] Swipe feed between episodes
+- [x] `FakeChat` template
+- [x] Tutor chat screen streaming `/api/tutor`, showing the source quotes it used
+- [x] Swipe feed between episodes
 
 ### Should (Day 2 afternoon, only if M4 is green)
-- [ ] `Top3Countdown` and `MythOrFact` templates; transitions; loading animation
+- [x] `Top3Countdown` and `MythOrFact` templates; transitions; loading animation
 
 ## Definition of done (every milestone)
 Checks pass, the browser check at 390×844 is reported, and the `reviewer` subagent ran on your diff with its findings fixed.
