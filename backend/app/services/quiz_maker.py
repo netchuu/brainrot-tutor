@@ -163,7 +163,13 @@ def trimmed(kept: list[AnyQuestion], count: int) -> list[AnyQuestion]:
     return singles[: count - len(opens)] + opens
 
 
-async def write_quiz(request: QuizRequest) -> QuizResponse:
+@dataclass(frozen=True)
+class QuizOutcome:
+    quiz: QuizResponse
+    complete: bool
+
+
+async def write_quiz(request: QuizRequest) -> QuizOutcome:
     started = time.perf_counter()
     source = GroundedSource(request.source_text)
     scenes = request.episode.scenes
@@ -183,13 +189,16 @@ async def write_quiz(request: QuizRequest) -> QuizResponse:
         (question, check.problems) for question, check in zip(draft.questions, checks, strict=True) if check.problems
     ]
     repair_error: RateLimitedError | LlmUnavailableError | None = None
-    if failing and len(kept) < request.question_count and time.perf_counter() - started < REPAIR_CUTOFF_S:
+    needs_repair = bool(failing) and len(kept) < request.question_count
+    repaired = False
+    if needs_repair and time.perf_counter() - started < REPAIR_CUTOFF_S:
         logger.info("quiz: %d of %d questions failed checks, repairing", len(failing), len(checks))
         note = OPEN_NOTE if any(question.kind == "open" for question in kept) else ""
         prompt = REPAIR_PROMPT.substitute(context, note=note, problems=describe_failures(failing))
         try:
             fixes = await generate_json(system, prompt, QuestionFixes)
             check_all(fixes.questions[: len(failing)], source, scene_ids, kept)
+            repaired = True
         except (RateLimitedError, LlmUnavailableError) as exc:
             logger.warning("quiz repair call failed with %s", exc.code)
             repair_error = exc
@@ -199,18 +208,23 @@ async def write_quiz(request: QuizRequest) -> QuizResponse:
             raise repair_error
         raise LlmUnavailableError("The AI could not write a quiz grounded in this text. Try again.")
     numbered = [question.model_copy(update={"id": f"q{number}"}) for number, question in enumerate(questions, start=1)]
-    return QuizResponse(episode=request.episode.index, questions=numbered)
+    logger.info("quiz ready after %d ms", round((time.perf_counter() - started) * 1000))
+    quiz = QuizResponse(episode=request.episode.index, questions=numbered)
+    # A quiz shortened because the repair was skipped or failed is not kept; asking again may complete it.
+    return QuizOutcome(quiz=quiz, complete=not needs_repair or repaired)
 
 
 async def make_quiz(request: QuizRequest) -> QuizResponse:
     key = cache_key("quiz", request.model_dump(mode="json"))
     cached = QUIZ_CACHE.get(key)
     if cached is not None:
+        logger.info("quiz served from cache")
         return cached
     try:
         async with asyncio.timeout(QUIZ_DEADLINE_S):
-            quiz = await write_quiz(request)
+            outcome = await write_quiz(request)
     except TimeoutError:
         raise LlmUnavailableError("Writing the quiz took too long. Try again.") from None
-    QUIZ_CACHE.put(key, quiz)
-    return quiz
+    if outcome.complete:
+        QUIZ_CACHE.put(key, outcome.quiz)
+    return outcome.quiz

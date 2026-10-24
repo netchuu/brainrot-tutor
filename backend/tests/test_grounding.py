@@ -145,3 +145,10 @@ def test_long_text_and_invented_quote_are_problems() -> None:
     assert len(check.problems) == 2
     assert "characters" in check.problems[0]
     assert "source_quote" in check.problems[1]
+
+
+def test_near_match_with_other_numbers_is_rejected() -> None:
+    source = GroundedSource(SOURCE_TEXT)
+    wrong = "Мощность двигателя в лошадиных силах считают по формуле P = M × n / 9000, где M — момент в Н·м."
+
+    assert source.snap_quote(wrong) is None

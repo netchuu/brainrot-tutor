@@ -8,6 +8,7 @@ from app.config import get_settings
 from app.errors import RateLimitedError
 from app.schemas.contract import GradeRequest, OpenQuestion
 from app.schemas.quiz import GradeDraft, QuizDraft, TutorDraft
+from app.schemas.script import EpisodeDraft
 from app.services import grader, quiz_maker, script_writer, tutor
 from app.services.cache import LruCache, cache_key
 from app.services.narrator import narrate
@@ -127,7 +128,7 @@ async def test_found_picture_is_reused_and_misses_are_retried(
 async def test_quiz_grade_and_tutor_answers_are_reused(monkeypatch: pytest.MonkeyPatch) -> None:
     quiz_llm = CountingLlm(QuizDraft(questions=quiz_drafts()))
     grade_llm = CountingLlm(GradeDraft(score=0.9, feedback="Верно."))
-    tutor_llm = CountingLlm(TutorDraft(answer=FIXTURE_ANSWER, source_quotes=FIXTURE_QUOTES))
+    tutor_llm = CountingLlm(TutorDraft(answer=FIXTURE_ANSWER, covered=True, source_quotes=FIXTURE_QUOTES))
     monkeypatch.setattr(quiz_maker, "generate_json", quiz_llm)
     monkeypatch.setattr(grader, "generate_json", grade_llm)
     monkeypatch.setattr(tutor, "generate_json", tutor_llm)
@@ -141,3 +142,70 @@ async def test_quiz_grade_and_tutor_answers_are_reused(monkeypatch: pytest.Monke
         await tutor.answer_question(TUTOR_REQUEST)
 
     assert (quiz_llm.calls, grade_llm.calls, tutor_llm.calls) == (1, 1, 1)
+
+
+async def test_course_shortened_by_a_failed_repair_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = fixture_drafts()
+    invented = [s.model_copy(update={"source_quote": "Выдумка без опоры в тексте."}) for s in drafts[1].scenes]
+    drafts[1] = drafts[1].model_copy(update={"scenes": invented})
+    calls = 0
+
+    async def fake(system: str, prompt: str, model: type[BaseModel]) -> BaseModel:
+        nonlocal calls
+        calls += 1
+        if model is not EpisodeDraft:
+            raise RateLimitedError("busy")
+        return drafts[int(prompt.split("Episode ", 1)[1][0]) - 1]
+
+    monkeypatch.setattr(script_writer, "generate_json", fake)
+
+    first = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+    await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert [episode.number for episode in first.episodes] == [0, 2]
+    assert calls == 8
+
+
+async def test_quiz_shortened_by_a_failed_repair_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = quiz_drafts()
+    drafts[1] = drafts[1].model_copy(update={"source_quote": "Выдумка без опоры в исходном тексте вообще."})
+    calls = 0
+
+    async def fake(system: str, prompt: str, model: type[BaseModel]) -> BaseModel:
+        nonlocal calls
+        calls += 1
+        if model is QuizDraft:
+            return QuizDraft(questions=drafts)
+        raise RateLimitedError("busy")
+
+    monkeypatch.setattr(quiz_maker, "generate_json", fake)
+
+    first = await quiz_maker.make_quiz(QUIZ_REQUEST)
+    await quiz_maker.make_quiz(QUIZ_REQUEST)
+
+    assert len(first.questions) == 3
+    assert calls == 4
+
+
+async def test_script_cache_key_includes_every_parameter(monkeypatch: pytest.MonkeyPatch) -> None:
+    llm = CountingLlm(fixture_drafts()[0])
+    monkeypatch.setattr(script_writer, "generate_json", llm)
+
+    await script_writer.write_script(SOURCE_TEXT, "ru", 1, None)
+    await script_writer.write_script(SOURCE_TEXT, "ru", 1, "fake_chat")
+    await script_writer.write_script(SOURCE_TEXT, "en", 1, None)
+
+    assert llm.calls == 3
+
+
+async def test_voice_with_missing_word_timings_is_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    FakeCommunicate.created = []
+    FakeCommunicate.failures = []
+    FakeCommunicate.boundaries = [("Привет", 1_000_000, 5_000_000)]
+    FakeCommunicate.delay_s = 0.0
+    monkeypatch.setattr(edge_tts, "Communicate", FakeCommunicate)
+
+    await narrate("Привет, мир.", "kid", "ru")
+    await narrate("Привет, мир.", "kid", "ru")
+
+    assert len(FakeCommunicate.created) == 2

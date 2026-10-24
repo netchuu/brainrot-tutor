@@ -33,6 +33,7 @@ select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "BLE", "RUF", "N", "ANN", "FIX
 # Russian text and patterns use Cyrillic letters, which the confusable-character rules misread as typos.
 "tests/**" = ["RUF001", "RUF003"]
 "app/services/quiz_maker.py" = ["RUF001"]
+"app/services/tutor.py" = ["RUF001"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"

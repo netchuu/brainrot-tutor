@@ -19,8 +19,8 @@ MP3_BYTES_PER_MS = 48_000 / 8 / 1000
 LEAD_IN_MS = 100
 ESTIMATED_CHARS_PER_S = 14
 MIN_WORD_MS = 120
-# About 50 KB of base64 MP3 per line, so 300 lines stay near 15 MB.
-VOICE_CACHE: LruCache["Narration"] = LruCache(300)
+# A 220-character line is up to about 125 KB of base64 MP3, so 200 lines stay under 25 MB.
+VOICE_CACHE: LruCache["Narration"] = LruCache(200)
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,8 @@ async def narrate(text: str, character: CharacterId, language: Language) -> Narr
     if cached is not None:
         return cached
     narration = await speak(text, character, language)
-    if not narration.words_estimated:
+    # Only a narration whose timings cover every spoken word is kept; a cut-off one may succeed next time.
+    if not narration.words_estimated and len(narration.words) == len(SPOKEN_WORD.findall(text)):
         VOICE_CACHE.put(key, narration)
     return narration
 

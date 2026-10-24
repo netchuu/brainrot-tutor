@@ -16,7 +16,7 @@ Episode:
 Template (the video layout):
 - $template_rule
 - parkour_duo: a teacher and student dialogue over a gameplay clip; a picture can illustrate any line.
-- split_screen: the teacher walks through one formula or one key term. Every teacher scene gets a formula (TeX without dollar signs, for example P = \frac{M \times n}{7023}) when the line is about a formula or a calculation, otherwise a term: a short card of at most 60 characters, for example "Чип-тюнинг = изменение карт ЭБУ".
+- split_screen: the teacher walks through one formula or one key term from the SOURCE FRAGMENT. Every teacher scene gets a formula (TeX without dollar signs, built only from the symbols and numbers of the fragment or of the spoken line, in the style of v = \frac{s}{t}) when the line is about a formula or a calculation, otherwise a term: a short card of at most 60 characters that names the idea of the line in the words of the fragment.
 - fake_chat: a fast chat between the student and the teacher: short messages, more student questions, jokes are welcome.
 - top3_countdown: the three most important facts as a countdown: three teacher scenes with rank 3, then 2, then 1, plus an optional opening and closing line.
 - myth_or_fact: the teacher states a claim, the student guesses, the teacher reveals it; every claim scene gets verdict "myth" or "fact" according to the SOURCE FRAGMENT.

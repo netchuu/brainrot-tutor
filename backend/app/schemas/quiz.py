@@ -35,4 +35,5 @@ class GradeDraft(QuizModel):
 
 class TutorDraft(QuizModel):
     answer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
-    source_quotes: list[str] = Field(max_length=5)
+    covered: bool
+    source_quotes: list[str]

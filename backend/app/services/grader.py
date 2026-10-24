@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import time
 from string import Template
 
 from app.clients.llm import generate_json
@@ -17,12 +19,16 @@ PASS_SCORE = 0.6
 GRADE_DEADLINE_S = 50
 GRADE_CACHE: LruCache[GradeResponse] = LruCache(256)
 
+logger = logging.getLogger(__name__)
+
 
 async def grade_answer(request: GradeRequest) -> GradeResponse:
     key = cache_key("grade", request.model_dump(mode="json"))
     cached = GRADE_CACHE.get(key)
     if cached is not None:
+        logger.info("grade served from cache")
         return cached
+    started = time.perf_counter()
     system = SYSTEM_PROMPT.substitute(language_name=LANGUAGE_NAMES[request.language])
     prompt = ANSWER_PROMPT.substitute(
         question=defang(request.question.prompt),
@@ -38,4 +44,5 @@ async def grade_answer(request: GradeRequest) -> GradeResponse:
     score = round(draft.score, 2)
     result = GradeResponse(correct=score >= PASS_SCORE, score=score, feedback=draft.feedback)
     GRADE_CACHE.put(key, result)
+    logger.info("grade ready after %d ms", round((time.perf_counter() - started) * 1000))
     return result

@@ -6,7 +6,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from app.errors import LlmUnavailableError
+from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import ChatMessage, TutorRequest
 from app.schemas.quiz import TutorDraft
 from app.services import tutor
@@ -50,7 +50,9 @@ async def collect(request: TutorRequest = REQUEST) -> list[dict[str, Any]]:
 
 async def test_answer_streams_as_deltas_then_grounded_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
     invented = "Диностенд нужен только для красивых фотографий машины."
-    fake = install(monkeypatch, FakeLlm(TutorDraft(answer=FIXTURE_ANSWER, source_quotes=[*FIXTURE_QUOTES, invented])))
+    fake = install(
+        monkeypatch, FakeLlm(TutorDraft(answer=FIXTURE_ANSWER, covered=True, source_quotes=[*FIXTURE_QUOTES, invented]))
+    )
 
     events = await collect()
 
@@ -67,8 +69,8 @@ async def test_invented_quotes_get_one_retry(monkeypatch: pytest.MonkeyPatch) ->
     fake = install(
         monkeypatch,
         FakeLlm(
-            TutorDraft(answer="Первый ответ.", source_quotes=[invented]),
-            TutorDraft(answer=FIXTURE_ANSWER, source_quotes=FIXTURE_QUOTES[:1]),
+            TutorDraft(answer="Первый ответ.", covered=True, source_quotes=[invented]),
+            TutorDraft(answer=FIXTURE_ANSWER, covered=True, source_quotes=FIXTURE_QUOTES[:1]),
         ),
     )
 
@@ -80,12 +82,15 @@ async def test_invented_quotes_get_one_retry(monkeypatch: pytest.MonkeyPatch) ->
 
 
 async def test_uncovered_question_needs_no_quotes(monkeypatch: pytest.MonkeyPatch) -> None:
-    fake = install(monkeypatch, FakeLlm(TutorDraft(answer="В тексте нет ответа на этот вопрос.", source_quotes=[])))
+    uncovered = TutorDraft(answer="В тексте нет ответа на этот вопрос.", covered=False, source_quotes=[])
+    fake = install(monkeypatch, FakeLlm(uncovered, uncovered))
 
     events = await collect()
+    await collect()
 
-    assert len(fake.calls) == 1
+    assert len(fake.calls) == 2
     assert events[-1] == {"type": "done", "source_quotes": []}
+    assert "".join(event["text"] for event in events[:-1]) == uncovered.answer
 
 
 async def test_llm_failure_is_an_error_event(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,7 +104,7 @@ async def test_llm_failure_is_an_error_event(monkeypatch: pytest.MonkeyPatch) ->
 
 
 async def test_slow_answer_hits_the_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
-    install(monkeypatch, FakeLlm(TutorDraft(answer="Поздно.", source_quotes=[]), delay_s=1))
+    install(monkeypatch, FakeLlm(TutorDraft(answer="Поздно.", covered=False, source_quotes=[]), delay_s=1))
     monkeypatch.setattr(tutor, "TUTOR_DEADLINE_S", 0.05)
 
     events = await collect()
@@ -152,7 +157,7 @@ def test_pieces_rebuild_the_answer() -> None:
 
 
 async def test_route_streams_ndjson(client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    install(monkeypatch, FakeLlm(TutorDraft(answer=FIXTURE_ANSWER, source_quotes=FIXTURE_QUOTES)))
+    install(monkeypatch, FakeLlm(TutorDraft(answer=FIXTURE_ANSWER, covered=True, source_quotes=FIXTURE_QUOTES)))
 
     response = await client.post("/api/tutor", json=REQUEST.model_dump())
 
@@ -177,3 +182,80 @@ async def test_route_rejects_bad_chats(client: httpx.AsyncClient, messages: list
     assert response.status_code == 422
     validator("ErrorResponse").validate(response.json())
     assert response.json()["error"]["code"] == "bad_input"
+
+
+INVENTED = "Диностенд нужен только для красивых фотографий машины."
+
+
+async def test_unsupported_answer_is_replaced_and_not_cached(monkeypatch: pytest.MonkeyPatch) -> None:
+    unsupported = TutorDraft(answer="Выдуманный ответ.", covered=True, source_quotes=[INVENTED])
+    fake = install(monkeypatch, FakeLlm(unsupported, unsupported, unsupported, unsupported))
+
+    events = await collect()
+    await collect()
+
+    assert "".join(event["text"] for event in events[:-1]) == tutor.NOT_FOUND["ru"]
+    assert events[-1] == {"type": "done", "source_quotes": []}
+    assert len(fake.calls) == 4
+
+
+async def test_covered_answer_without_quotes_gets_the_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = install(
+        monkeypatch,
+        FakeLlm(
+            TutorDraft(answer="Ответ без цитат.", covered=True, source_quotes=[]),
+            TutorDraft(answer=FIXTURE_ANSWER, covered=True, source_quotes=FIXTURE_QUOTES),
+        ),
+    )
+
+    events = await collect()
+
+    assert len(fake.calls) == 2
+    assert events[-1]["source_quotes"] == FIXTURE_QUOTES
+
+
+async def test_failed_retry_gives_the_not_found_reply(monkeypatch: pytest.MonkeyPatch) -> None:
+    install(
+        monkeypatch,
+        FakeLlm(TutorDraft(answer="Выдумка.", covered=True, source_quotes=[INVENTED]), RateLimitedError("busy")),
+    )
+
+    events = await collect()
+
+    assert "".join(event["text"] for event in events[:-1]) == tutor.NOT_FOUND["ru"]
+
+
+async def test_quotes_are_deduplicated_and_capped_at_three(monkeypatch: pytest.MonkeyPatch) -> None:
+    sentences = GroundedSource(SOURCE_TEXT).sentences
+    quotes = [sentences[0], sentences[0], sentences[1], sentences[2], sentences[3]]
+    install(monkeypatch, FakeLlm(TutorDraft(answer=FIXTURE_ANSWER, covered=True, source_quotes=quotes)))
+
+    events = await collect()
+
+    assert events[-1]["source_quotes"] == sentences[:3]
+
+
+async def test_grounded_answer_is_served_from_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = install(monkeypatch, FakeLlm(TutorDraft(answer=FIXTURE_ANSWER, covered=True, source_quotes=FIXTURE_QUOTES)))
+
+    first = await collect()
+    second = await collect()
+
+    assert first == second
+    assert len(fake.calls) == 1
+
+
+def test_unpunctuated_long_source_still_gives_an_excerpt() -> None:
+    notes = " ".join(f"пункт {n} настройка двигателя и датчиков без точек" for n in range(600))
+    source = GroundedSource(notes + " диностенд замеры до прошивки " + notes)
+
+    excerpts = tutor.excerpts_for(source, QUESTION)
+
+    assert 0 < len(excerpts) <= tutor.EXCERPT_BUDGET_CHARS + 200
+    assert "диностенд" in excerpts
+
+
+def test_chat_is_capped_in_length() -> None:
+    messages = [ChatMessage(role="user", content="о" * 2000) for _ in range(8)]
+
+    assert len(tutor.chat_text(messages)) <= tutor.CHAT_CHARS + 20

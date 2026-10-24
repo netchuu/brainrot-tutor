@@ -22,7 +22,7 @@ You own `backend/`. Before your first change read: the root `CLAUDE.md`, `contra
 - Absolute imports only (`from app.services.narrator import narrate_scene`); no relative imports; no imports inside functions
 - Type hints on every function and return; no `Any` unless a library forces it
 - No docstrings; a comment only for a non-obvious why, one line; no TODO or FIXME
-- Specific exceptions only, defined in `app/errors.py` (`LlmUnavailableError`, `RateLimitedError`, `SourceTooLongError`), each mapped to a contract `ErrorCode`; catch only what you handle. One exception: the episode stream's last-resort handler logs any failure and ends the stream with an `internal` error event, because the status is already 200
+- Specific exceptions only, defined in `app/errors.py` (`LlmUnavailableError`, `RateLimitedError`, `SourceTooLongError`), each mapped to a contract `ErrorCode`; catch only what you handle. One exception: the last-resort handlers of the episode and tutor streams log any failure and end the stream with an `internal` error event, because the status is already 200
 - Secrets only from env via `app/config.py`; never log keys or full source texts; never open `.env`
 
 ### Architecture
@@ -100,9 +100,9 @@ Gates and times come from `docs/PLAN.md`. Tick boxes here as you finish them.
 - [x] `POST /api/quiz/grade`
 
 ### M4 MVP complete (Day 2, 12:00)
-- [ ] `POST /api/tutor`: streaming answer only from the source, `done` lists the quotes used
-- [ ] AI picks the template per episode from `parkour_duo`, `split_screen`, `fake_chat` (plus `top3_countdown` and `myth_or_fact` once the frontend has them; fill `rank` / `verdict` / `formula` / `term` as the template needs)
-- [ ] Stage timings logged; in-memory cache
+- [x] `POST /api/tutor`: streaming answer only from the source, `done` lists the quotes used
+- [x] AI picks the template per episode from `parkour_duo`, `split_screen`, `fake_chat` (plus `top3_countdown` and `myth_or_fact` once the frontend has them; fill `rank` / `verdict` / `formula` / `term` as the template needs)
+- [x] Stage timings logged; in-memory cache
 
 ### Stretch (only if the user asks after M4)
 - [ ] MP4 export with FFmpeg

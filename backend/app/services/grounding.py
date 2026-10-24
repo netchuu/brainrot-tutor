@@ -14,6 +14,8 @@ QUOTE_MATCH_RATIO = 0.9
 WHITESPACE = re.compile(r"\s+")
 SENTENCE_BREAK = re.compile(r"(?<=[.!?…])\s+")
 SPOKEN_WORD = re.compile(r"\w+(?:[-'\u2019]\w+)*")
+NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+STEM_CHARS = 5
 
 
 def normalize(text: str) -> str:
@@ -23,6 +25,10 @@ def normalize(text: str) -> str:
 def defang(text: str) -> str:
     # Client and source text sit inside <<< >>> fences in prompts, so they must not be able to close one.
     return text.replace("<<<", "\u2039\u2039\u2039").replace(">>>", "\u203a\u203a\u203a")
+
+
+def word_stems(text: str) -> set[str]:
+    return {word.casefold()[:STEM_CHARS] for word in SPOKEN_WORD.findall(text) if len(word) > 2}
 
 
 def is_proof_sized(quote: str) -> bool:
@@ -60,7 +66,11 @@ class GroundedSource:
             return candidate
         # A near-verbatim quote (other quote marks, yo/ye spelling, dash type) is replaced by the real source sentence.
         best_ratio, best_sentence = 0.0, None
+        numbers = NUMBER.findall(candidate)
         for sentence in (sentence for sentence in self.sentences if is_proof_sized(sentence)):
+            # A near match may differ in punctuation or spelling, never in its numbers.
+            if NUMBER.findall(sentence) != numbers:
+                continue
             matcher = SequenceMatcher(None, candidate, sentence, autojunk=False)
             if matcher.real_quick_ratio() < QUOTE_MATCH_RATIO or matcher.quick_ratio() < QUOTE_MATCH_RATIO:
                 continue

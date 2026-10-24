@@ -258,10 +258,10 @@ async def test_forced_template_is_named_in_the_prompt(monkeypatch: pytest.Monkey
 def test_slots_are_cleared_outside_their_template() -> None:
     scene = fixture_drafts()[1].scenes[1].model_copy(update={"rank": 2, "verdict": "fact"})
 
-    parkour = script_writer.fit_template(scene, "parkour_duo")
-    split = script_writer.fit_template(scene, "split_screen")
-    top3 = script_writer.fit_template(scene, "top3_countdown")
-    myth = script_writer.fit_template(scene, "myth_or_fact")
+    parkour = script_writer.fit_template(scene, "parkour_duo", SOURCE_TEXT)
+    split = script_writer.fit_template(scene, "split_screen", SOURCE_TEXT)
+    top3 = script_writer.fit_template(scene, "top3_countdown", SOURCE_TEXT)
+    myth = script_writer.fit_template(scene, "myth_or_fact", SOURCE_TEXT)
 
     assert (parkour.formula, parkour.term, parkour.rank, parkour.verdict) == (None, None, None, None)
     assert (split.formula, split.rank, split.verdict) == (scene.formula, None, None)
@@ -284,7 +284,7 @@ def test_split_screen_slots_are_cleaned(
 ) -> None:
     scene = fixture_drafts()[1].scenes[0].model_copy(update={"formula": formula, "term": term})
 
-    fitted = script_writer.fit_template(scene, "split_screen")
+    fitted = script_writer.fit_template(scene, "split_screen", SOURCE_TEXT)
 
     assert (fitted.formula, fitted.term) == expected
 
@@ -292,4 +292,38 @@ def test_split_screen_slots_are_cleaned(
 def test_out_of_range_rank_is_cleared() -> None:
     scene = fixture_drafts()[0].scenes[0].model_copy(update={"rank": 4})
 
-    assert script_writer.fit_template(scene, "top3_countdown").rank is None
+    assert script_writer.fit_template(scene, "top3_countdown", SOURCE_TEXT).rank is None
+
+
+@pytest.mark.parametrize(
+    ("formula", "expected"),
+    [
+        ("$P$ = $M$", "P = M"),
+        ("\\(P = \\frac{M \\times n}{7023}\\)", "P = \\frac{M \\times n}{7023}"),
+        ("E = m c^2", None),
+        ("P = \\frac{200 \\times 5000}{7023} \\approx 142", "P = \\frac{200 \\times 5000}{7023} \\approx 142"),
+    ],
+    ids=["inner-dollars", "paren-delimiters", "foreign-formula", "worked-example-from-line"],
+)
+def test_formula_must_come_from_fragment_or_line(formula: str, expected: str | None) -> None:
+    scene = fixture_drafts()[1].scenes[2].model_copy(update={"formula": formula})
+
+    assert script_writer.fit_template(scene, "split_screen", SOURCE_TEXT.split("\n\n")[1]).formula == expected
+
+
+def test_term_must_share_words_with_its_line() -> None:
+    scene = fixture_drafts()[1].scenes[0]
+    foreign = scene.model_copy(update={"term": "Фотосинтез = свет в сахар"})
+
+    assert script_writer.fit_template(scene, "split_screen", SOURCE_TEXT).term == scene.term
+    assert script_writer.fit_template(foreign, "split_screen", SOURCE_TEXT).term is None
+
+
+@pytest.mark.parametrize(("chosen", "expected"), [("fake_chat", "fake_chat"), ("myth_or_fact", "parkour_duo")])
+async def test_unforced_template_choice(monkeypatch: pytest.MonkeyPatch, chosen: str, expected: str) -> None:
+    drafts = [draft.model_copy(update={"template": chosen}) for draft in fixture_drafts()]
+    install(monkeypatch, FakeLlm(drafts))
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert {episode.template for episode in script.episodes} == {expected}

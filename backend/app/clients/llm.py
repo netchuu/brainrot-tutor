@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -149,8 +150,13 @@ async def generate_with[T: BaseModel](call: ProviderCall, system: str, prompt: s
 async def generate_json[T: BaseModel](system: str, prompt: str, model: type[T]) -> T:
     outcomes: list[str] = []
     for name, call in PROVIDERS:
+        started = time.perf_counter()
         try:
-            return await generate_with(call, system, prompt, model)
+            result = await generate_with(call, system, prompt, model)
+            logger.info(
+                "%s answered %s after %d ms", name, model.__name__, round((time.perf_counter() - started) * 1000)
+            )
+            return result
         except ProviderRateLimitedError:
             outcomes.append("rate_limited")
             logger.warning("%s is rate limited, trying the next provider", name)

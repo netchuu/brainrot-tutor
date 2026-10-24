@@ -3,6 +3,7 @@ import json
 import logging
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from string import Template
 from typing import get_args
 
@@ -12,7 +13,7 @@ from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import Language, TemplateId
 from app.schemas.script import AiTemplate, CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
 from app.services.cache import LruCache, cache_key
-from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, defang, normalize
+from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, defang, normalize, word_stems
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,9 @@ CHOOSE_TEMPLATE = (
 MAX_TERM_CHARS = 80
 SCRIPT_CACHE: LruCache[CourseScript] = LruCache(32)
 MAX_FORMULA_CHARS = 200
+TEX_DELIMITERS = re.compile(r"\$|\\[()\[\]]")
+TEX_COMMAND = re.compile(r"\\[A-Za-z]+")
+FORMULA_TOKEN = re.compile(r"[A-Za-z]+|\d+(?:[.,]\d+)*")
 PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
 
 
@@ -67,9 +71,21 @@ def describe_failures(failing: list[tuple[ScriptScene, list[str]]]) -> str:
     )
 
 
+@dataclass(frozen=True)
+class Repair:
+    scenes: list[ScriptScene | None]
+    provider_failed: bool
+
+
+@dataclass(frozen=True)
+class EpisodeOutcome:
+    draft: EpisodeDraft | None
+    degraded: bool
+
+
 async def repair_scenes(
     system: str, fragment: str, episode: int, failing: list[tuple[ScriptScene, list[str]]]
-) -> list[ScriptScene | None]:
+) -> Repair:
     prompt = REPAIR_PROMPT.substitute(
         episode_number=episode + 1, count=len(failing), problems=describe_failures(failing), fragment=defang(fragment)
     )
@@ -77,10 +93,10 @@ async def repair_scenes(
         fixes = await generate_json(system, prompt, SceneFixes)
     except (RateLimitedError, LlmUnavailableError) as exc:
         logger.warning("episode %d: repair call failed (%s), dropping %d scenes", episode, exc.code, len(failing))
-        return [None] * len(failing)
+        return Repair(scenes=[None] * len(failing), provider_failed=True)
     if len(fixes.scenes) != len(failing):
         logger.warning("episode %d: repair returned %d scenes for %d", episode, len(fixes.scenes), len(failing))
-        return [None] * len(failing)
+        return Repair(scenes=[None] * len(failing), provider_failed=False)
     source = GroundedSource(fragment)
     repaired: list[ScriptScene | None] = []
     for (original, _), scene in zip(failing, fixes.scenes, strict=True):
@@ -90,12 +106,12 @@ async def repair_scenes(
             bool(original.source_quote) and check.scene.source_quote is None
         )
         repaired.append(None if check.problems or dodged else check.scene)
-    return repaired
+    return Repair(scenes=repaired, provider_failed=False)
 
 
 async def write_episode(
     system: str, fragment: str, episode: int, episode_count: int, forced: TemplateId | None = None
-) -> EpisodeDraft | None:
+) -> EpisodeOutcome:
     prompt = EPISODE_PROMPT.substitute(
         episode_number=episode + 1, episode_count=episode_count, fragment=defang(fragment)
     )
@@ -104,37 +120,51 @@ async def write_episode(
     checks = [check_scene(scene, source) for scene in draft.scenes]
     scenes: list[ScriptScene | None] = [check.scene for check in checks]
     failing = [index for index, check in enumerate(checks) if check.problems]
+    degraded = False
     if failing:
         logger.info("episode %d: %d of %d scenes failed grounding, repairing", episode, len(failing), len(checks))
         originals = [(draft.scenes[index], checks[index].problems) for index in failing]
-        replacements = await repair_scenes(system, fragment, episode, originals)
-        for index, replacement in zip(failing, replacements, strict=True):
+        repair = await repair_scenes(system, fragment, episode, originals)
+        degraded = repair.provider_failed
+        for index, replacement in zip(failing, repair.scenes, strict=True):
             scenes[index] = replacement
     template = episode_template(draft, forced)
-    kept = [fit_template(scene, template) for scene in scenes if scene is not None]
+    kept = [fit_template(scene, template, fragment) for scene in scenes if scene is not None]
     if not kept:
         logger.warning("episode %d: no grounded scenes left, dropping the episode", episode)
+        return EpisodeOutcome(draft=None, degraded=degraded)
+    return EpisodeOutcome(draft=draft.model_copy(update={"scenes": kept, "template": template}), degraded=degraded)
+
+
+def appears_in(token: str, text: str) -> bool:
+    return re.search(rf"(?<![A-Za-z0-9]){re.escape(token)}(?![A-Za-z0-9])", text) is not None
+
+
+def clean_formula(formula: str | None, grounding: str) -> str | None:
+    cleaned = TEX_DELIMITERS.sub("", formula or "").strip()
+    if not 0 < len(cleaned) <= MAX_FORMULA_CHARS:
         return None
-    return draft.model_copy(update={"scenes": kept, "template": template})
+    # Every number and variable must come from the fragment or the spoken line, so a copied example cannot slip in.
+    tokens = FORMULA_TOKEN.findall(TEX_COMMAND.sub(" ", cleaned))
+    return cleaned if all(appears_in(token, grounding) for token in tokens) else None
 
 
-def clean_formula(formula: str | None) -> str | None:
-    cleaned = (formula or "").strip().strip("$").strip()
-    return cleaned if 0 < len(cleaned) <= MAX_FORMULA_CHARS else None
-
-
-def clean_term(term: str | None) -> str | None:
+def clean_term(term: str | None, grounding: str) -> str | None:
     cleaned = normalize(term or "")
-    return cleaned if 0 < len(cleaned) <= MAX_TERM_CHARS else None
+    if not 0 < len(cleaned) <= MAX_TERM_CHARS:
+        return None
+    return cleaned if word_stems(cleaned) & word_stems(grounding) else None
 
 
-def fit_template(scene: ScriptScene, template: TemplateId) -> ScriptScene:
+def fit_template(scene: ScriptScene, template: TemplateId, fragment: str) -> ScriptScene:
     # Slots belong to one template each; anything else the model filled in is cleared so the player never sees it.
     split_screen = template == "split_screen"
+    formula_grounding = f"{fragment} {scene.text}"
+    term_grounding = f"{scene.source_quote or ''} {scene.text}"
     return scene.model_copy(
         update={
-            "formula": clean_formula(scene.formula) if split_screen else None,
-            "term": clean_term(scene.term) if split_screen else None,
+            "formula": clean_formula(scene.formula, formula_grounding) if split_screen else None,
+            "term": clean_term(scene.term, term_grounding) if split_screen else None,
             "rank": scene.rank if template == "top3_countdown" and scene.rank in (1, 2, 3) else None,
             "verdict": scene.verdict if template == "myth_or_fact" else None,
         }
@@ -158,15 +188,15 @@ EpisodeReady = Callable[[int, list[ScriptScene]], None]
 
 async def attempt_episode(
     system: str, fragment: str, number: int, count: int, forced: TemplateId | None, on_ready: EpisodeReady | None
-) -> EpisodeDraft | RateLimitedError | LlmUnavailableError | None:
+) -> EpisodeOutcome | RateLimitedError | LlmUnavailableError:
     try:
-        draft = await write_episode(system, fragment, number, count, forced)
+        outcome = await write_episode(system, fragment, number, count, forced)
     except (RateLimitedError, LlmUnavailableError) as exc:
         logger.warning("episode %d failed with %s, keeping the other episodes", number, exc.code)
         return exc
-    if draft is not None and on_ready is not None:
-        on_ready(number, draft.scenes)
-    return draft
+    if outcome.draft is not None and on_ready is not None:
+        on_ready(number, outcome.draft.scenes)
+    return outcome
 
 
 async def write_script(
@@ -197,19 +227,23 @@ async def write_script(
             for number, fragment in enumerate(fragments)
         ]
     results = [task.result() for task in tasks]
-    episodes = [
-        EpisodeScript(number=number, title=result.title, template=result.template, scenes=result.scenes)
+    drafts = [
+        (number, result.draft)
         for number, result in enumerate(results)
-        if isinstance(result, EpisodeDraft)
+        if isinstance(result, EpisodeOutcome) and result.draft is not None
     ]
     failures = [result for result in results if isinstance(result, RateLimitedError | LlmUnavailableError)]
-    if not episodes:
+    if not drafts:
         if failures:
             raise failures[0]
         raise LlmUnavailableError("The AI could not write a lesson grounded in this text. Try again.")
-    course_title = next(result.course_title for result in results if isinstance(result, EpisodeDraft))
-    script = CourseScript(course_title=course_title, language=language, episodes=episodes)
-    # A course missing an episode because a provider failed is not kept; the next request may get all three.
-    if not failures:
+    episodes = [
+        EpisodeScript(number=number, title=draft.title, template=draft.template, scenes=draft.scenes)
+        for number, draft in drafts
+    ]
+    script = CourseScript(course_title=drafts[0][1].course_title, language=language, episodes=episodes)
+    # A course shortened by a provider failure is not kept; the next request may get all of it.
+    degraded = bool(failures) or any(isinstance(result, EpisodeOutcome) and result.degraded for result in results)
+    if not degraded:
         SCRIPT_CACHE.put(key, script)
     return script
