@@ -25,6 +25,10 @@ def scene(
         reaction="shocked",
         sfx="buzzer",
         source_quote=quote,
+        formula=None,
+        term=None,
+        rank=None,
+        verdict=None,
     )
 
 

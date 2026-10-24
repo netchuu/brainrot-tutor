@@ -4,12 +4,13 @@ import logging
 import re
 from collections.abc import Callable
 from string import Template
+from typing import get_args
 
 from app.clients.llm import generate_json
 from app.config import PROMPTS_DIR
 from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import Language, TemplateId
-from app.schemas.script import CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
+from app.schemas.script import AiTemplate, CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
 from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, defang, normalize
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,15 @@ REPAIR_PROMPT = Template((PROMPTS_DIR / "script_repair.md").read_text(encoding="
 LANGUAGE_NAMES: dict[Language, str] = {"ru": "Russian", "en": "English"}
 SCENES_MIN = 4
 SCENES_MAX = 6
-DEFAULT_TEMPLATE: TemplateId = "parkour_duo"
+AI_TEMPLATES: tuple[AiTemplate, ...] = get_args(AiTemplate)
+CHOOSE_TEMPLATE = (
+    "Choose the template that fits the SOURCE FRAGMENT best and put it in template: "
+    "split_screen when it has a formula, a calculation or one central definition; "
+    "fake_chat for a story, a process or cause and effect; parkour_duo otherwise. "
+    "Only these three may be chosen."
+)
+MAX_TERM_CHARS = 80
+MAX_FORMULA_CHARS = 200
 PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
 
 
@@ -82,7 +91,9 @@ async def repair_scenes(
     return repaired
 
 
-async def write_episode(system: str, fragment: str, episode: int, episode_count: int) -> EpisodeDraft | None:
+async def write_episode(
+    system: str, fragment: str, episode: int, episode_count: int, forced: TemplateId | None = None
+) -> EpisodeDraft | None:
     prompt = EPISODE_PROMPT.substitute(
         episode_number=episode + 1, episode_count=episode_count, fragment=defang(fragment)
     )
@@ -97,21 +108,57 @@ async def write_episode(system: str, fragment: str, episode: int, episode_count:
         replacements = await repair_scenes(system, fragment, episode, originals)
         for index, replacement in zip(failing, replacements, strict=True):
             scenes[index] = replacement
-    kept = [scene for scene in scenes if scene is not None]
+    template = episode_template(draft, forced)
+    kept = [fit_template(scene, template) for scene in scenes if scene is not None]
     if not kept:
         logger.warning("episode %d: no grounded scenes left, dropping the episode", episode)
         return None
-    return draft.model_copy(update={"scenes": kept})
+    return draft.model_copy(update={"scenes": kept, "template": template})
+
+
+def clean_formula(formula: str | None) -> str | None:
+    cleaned = (formula or "").strip().strip("$").strip()
+    return cleaned if 0 < len(cleaned) <= MAX_FORMULA_CHARS else None
+
+
+def clean_term(term: str | None) -> str | None:
+    cleaned = normalize(term or "")
+    return cleaned if 0 < len(cleaned) <= MAX_TERM_CHARS else None
+
+
+def fit_template(scene: ScriptScene, template: TemplateId) -> ScriptScene:
+    # Slots belong to one template each; anything else the model filled in is cleared so the player never sees it.
+    split_screen = template == "split_screen"
+    return scene.model_copy(
+        update={
+            "formula": clean_formula(scene.formula) if split_screen else None,
+            "term": clean_term(scene.term) if split_screen else None,
+            "rank": scene.rank if template == "top3_countdown" and scene.rank in (1, 2, 3) else None,
+            "verdict": scene.verdict if template == "myth_or_fact" else None,
+        }
+    )
+
+
+def episode_template(draft: EpisodeDraft, forced: TemplateId | None) -> TemplateId:
+    if forced is not None:
+        return forced
+    return draft.template if draft.template in AI_TEMPLATES else "parkour_duo"
+
+
+def template_rule(forced: TemplateId | None) -> str:
+    if forced is None:
+        return CHOOSE_TEMPLATE
+    return f'The template is fixed: put "{forced}" in template and write every scene for it.'
 
 
 EpisodeReady = Callable[[int, list[ScriptScene]], None]
 
 
 async def attempt_episode(
-    system: str, fragment: str, number: int, count: int, on_ready: EpisodeReady | None
+    system: str, fragment: str, number: int, count: int, forced: TemplateId | None, on_ready: EpisodeReady | None
 ) -> EpisodeDraft | RateLimitedError | LlmUnavailableError | None:
     try:
-        draft = await write_episode(system, fragment, number, count)
+        draft = await write_episode(system, fragment, number, count, forced)
     except (RateLimitedError, LlmUnavailableError) as exc:
         logger.warning("episode %d failed with %s, keeping the other episodes", number, exc.code)
         return exc
@@ -129,16 +176,19 @@ async def write_script(
 ) -> CourseScript:
     fragments = split_source(source_text, episode_count)
     system = SYSTEM_PROMPT.substitute(
-        language_name=LANGUAGE_NAMES[language], scenes_min=SCENES_MIN, scenes_max=SCENES_MAX
+        language_name=LANGUAGE_NAMES[language],
+        scenes_min=SCENES_MIN,
+        scenes_max=SCENES_MAX,
+        template_rule=template_rule(template),
     )
     async with asyncio.TaskGroup() as group:
         tasks = [
-            group.create_task(attempt_episode(system, fragment, number, len(fragments), on_ready))
+            group.create_task(attempt_episode(system, fragment, number, len(fragments), template, on_ready))
             for number, fragment in enumerate(fragments)
         ]
     results = [task.result() for task in tasks]
     episodes = [
-        EpisodeScript(number=number, title=result.title, template=template or DEFAULT_TEMPLATE, scenes=result.scenes)
+        EpisodeScript(number=number, title=result.title, template=result.template, scenes=result.scenes)
         for number, result in enumerate(results)
         if isinstance(result, EpisodeDraft)
     ]

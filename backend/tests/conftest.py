@@ -47,6 +47,7 @@ def fixture_drafts() -> list[EpisodeDraft]:
         EpisodeDraft(
             course_title=FIXTURE_SCRIPT["course_title"],
             title=episode["title"],
+            template=episode["template"],
             scenes=[
                 ScriptScene(
                     speaker=spec["speaker"],
@@ -56,6 +57,10 @@ def fixture_drafts() -> list[EpisodeDraft]:
                     reaction=spec["reaction"],
                     sfx=spec["sfx"],
                     source_quote=spec["source_quote"],
+                    formula=spec.get("formula"),
+                    term=spec.get("term"),
+                    rank=spec.get("rank"),
+                    verdict=spec.get("verdict"),
                 )
                 for spec in episode["scenes"]
             ],

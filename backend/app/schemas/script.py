@@ -1,6 +1,11 @@
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.contract import Language, Reaction, Sfx, Speaker, TemplateId
+from app.schemas.contract import Language, Reaction, Sfx, Speaker, TemplateId, Verdict
+
+# Templates the AI may choose; the frontend plays these. A request can still force any TemplateId.
+AiTemplate = Literal["parkour_duo", "split_screen", "fake_chat"]
 
 
 class ScriptModel(BaseModel):
@@ -15,11 +20,16 @@ class ScriptScene(ScriptModel):
     reaction: Reaction
     sfx: Sfx
     source_quote: str | None
+    formula: str | None
+    term: str | None
+    rank: int | None
+    verdict: Verdict | None
 
 
 class EpisodeDraft(ScriptModel):
     course_title: str = Field(min_length=1)
     title: str = Field(min_length=1)
+    template: TemplateId
     scenes: list[ScriptScene] = Field(min_length=3, max_length=8)
 
 

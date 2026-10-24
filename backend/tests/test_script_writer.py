@@ -69,7 +69,8 @@ async def test_fixture_script_is_written_in_parallel_and_grounded(monkeypatch: p
     assert all(model is EpisodeDraft and "Russian" in system for system, _, model in fake.calls)
     assert script.course_title == FIXTURE_SCRIPT["course_title"]
     assert [episode.title for episode in script.episodes] == [e["title"] for e in FIXTURE_SCRIPT["episodes"]]
-    assert {episode.template for episode in script.episodes} == {"parkour_duo"}
+    assert [episode.template for episode in script.episodes] == [e["template"] for e in FIXTURE_SCRIPT["episodes"]]
+    assert script.episodes[1].scenes[1].formula == "P = \\frac{M \\times n}{7023}"
     source = normalize(SOURCE_TEXT)
     for episode in script.episodes:
         for scene in episode.scenes:
@@ -234,3 +235,61 @@ async def test_ready_callback_gets_each_episode_final_scenes(monkeypatch: pytest
 
     assert ready == {episode.number: [scene.text for scene in episode.scenes] for episode in script.episodes}
     assert len(ready[1]) == 2
+
+
+async def test_ai_cannot_choose_a_template_the_player_lacks(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = [draft.model_copy(update={"template": "top3_countdown"}) for draft in fixture_drafts()]
+    fake = install(monkeypatch, FakeLlm(drafts))
+
+    script = await script_writer.write_script(SOURCE_TEXT, "ru", 3, None)
+
+    assert {episode.template for episode in script.episodes} == {"parkour_duo"}
+    assert "Choose the template that fits" in fake.calls[0][0]
+
+
+async def test_forced_template_is_named_in_the_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = install(monkeypatch, FakeLlm(fixture_drafts()))
+
+    await script_writer.write_script(SOURCE_TEXT, "ru", 3, "myth_or_fact")
+
+    assert 'The template is fixed: put "myth_or_fact" in template' in fake.calls[0][0]
+
+
+def test_slots_are_cleared_outside_their_template() -> None:
+    scene = fixture_drafts()[1].scenes[1].model_copy(update={"rank": 2, "verdict": "fact"})
+
+    parkour = script_writer.fit_template(scene, "parkour_duo")
+    split = script_writer.fit_template(scene, "split_screen")
+    top3 = script_writer.fit_template(scene, "top3_countdown")
+    myth = script_writer.fit_template(scene, "myth_or_fact")
+
+    assert (parkour.formula, parkour.term, parkour.rank, parkour.verdict) == (None, None, None, None)
+    assert (split.formula, split.rank, split.verdict) == (scene.formula, None, None)
+    assert (top3.rank, top3.formula) == (2, None)
+    assert (myth.verdict, myth.rank) == ("fact", None)
+
+
+@pytest.mark.parametrize(
+    ("formula", "term", "expected"),
+    [
+        ("$P = M \\times n$", None, ("P = M \\times n", None)),
+        (None, "Чип-тюнинг = изменение карт ЭБУ", (None, "Чип-тюнинг = изменение карт ЭБУ")),
+        (None, "т" * 81, (None, None)),
+        ("x" * 201, "  ", (None, None)),
+    ],
+    ids=["dollar-signs", "term", "long-term", "long-formula"],
+)
+def test_split_screen_slots_are_cleaned(
+    formula: str | None, term: str | None, expected: tuple[str | None, ...]
+) -> None:
+    scene = fixture_drafts()[1].scenes[0].model_copy(update={"formula": formula, "term": term})
+
+    fitted = script_writer.fit_template(scene, "split_screen")
+
+    assert (fitted.formula, fitted.term) == expected
+
+
+def test_out_of_range_rank_is_cleared() -> None:
+    scene = fixture_drafts()[0].scenes[0].model_copy(update={"rank": 4})
+
+    assert script_writer.fit_template(scene, "top3_countdown").rank is None

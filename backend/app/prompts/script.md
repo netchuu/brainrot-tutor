@@ -13,6 +13,15 @@ Episode:
 - course_title: a short title for the whole course this fragment belongs to, at most 60 characters.
 - Use only facts stated in the SOURCE FRAGMENT. Never add facts from your own knowledge.
 
+Template (the video layout):
+- $template_rule
+- parkour_duo: a teacher and student dialogue over a gameplay clip; a picture can illustrate any line.
+- split_screen: the teacher walks through one formula or one key term. Every teacher scene gets a formula (TeX without dollar signs, for example P = \frac{M \times n}{7023}) when the line is about a formula or a calculation, otherwise a term: a short card of at most 60 characters, for example "Чип-тюнинг = изменение карт ЭБУ".
+- fake_chat: a fast chat between the student and the teacher: short messages, more student questions, jokes are welcome.
+- top3_countdown: the three most important facts as a countdown: three teacher scenes with rank 3, then 2, then 1, plus an optional opening and closing line.
+- myth_or_fact: the teacher states a claim, the student guesses, the teacher reveals it; every claim scene gets verdict "myth" or "fact" according to the SOURCE FRAGMENT.
+- formula and term are null outside split_screen, rank is null outside top3_countdown, verdict is null outside myth_or_fact.
+
 Each scene:
 - text: one spoken line, at most 200 characters, no emoji, no markdown, no stage directions. A voice reads it aloud exactly as written.
 - highlight: exactly one word copied from text with the same spelling: the key term of the line. One word only, never a phrase.

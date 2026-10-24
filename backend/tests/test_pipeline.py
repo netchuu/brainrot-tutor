@@ -278,3 +278,15 @@ async def test_whitespace_only_source_is_bad_input(client: httpx.AsyncClient) ->
     assert response.status_code == 422
     validator("ErrorResponse").validate(response.json())
     assert response.json()["error"]["code"] == "bad_input"
+
+
+async def test_template_slots_reach_the_scene_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    course = fixture_course()
+    install(monkeypatch, FakeMedia(course), course)
+
+    events = await collect()
+
+    split = [e["scene"] for e in events if e["type"] == "scene" and e["episode"] == 1]
+    assert split[0]["term"] == "Чип-тюнинг = изменение карт ЭБУ"
+    assert split[1]["formula"] == "P = \\frac{M \\times n}{7023}"
+    assert all(e["scene"]["formula"] is None for e in events if e["type"] == "scene" and e["episode"] != 1)
