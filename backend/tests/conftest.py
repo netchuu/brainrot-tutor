@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator, Iterator
 
 import httpx
@@ -5,9 +6,11 @@ import pytest
 
 from app.config import CONTRACTS_DIR, Settings, get_settings
 from app.main import create_app
+from app.schemas.script import EpisodeDraft, ScriptScene
 
 FIXTURES_DIR = CONTRACTS_DIR / "fixtures"
 SOURCE_TEXT = (FIXTURES_DIR / "source.txt").read_text(encoding="utf-8")
+FIXTURE_SCRIPT = json.loads((CONTRACTS_DIR / "tools" / "fixture_script.json").read_text(encoding="utf-8"))
 CONFIG_ENV = (
     "GEMINI_API_KEY",
     "GEMINI_MODEL",
@@ -37,3 +40,25 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
     transport = httpx.ASGITransport(app=create_app(), raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
         yield http
+
+
+def fixture_drafts() -> list[EpisodeDraft]:
+    return [
+        EpisodeDraft(
+            course_title=FIXTURE_SCRIPT["course_title"],
+            title=episode["title"],
+            scenes=[
+                ScriptScene(
+                    speaker=spec["speaker"],
+                    text=spec["text"],
+                    highlight=spec["highlight"],
+                    picture_query=spec.get("picture_query"),
+                    reaction=spec["reaction"],
+                    sfx=spec["sfx"],
+                    source_quote=spec["source_quote"],
+                )
+                for spec in episode["scenes"]
+            ],
+        )
+        for episode in FIXTURE_SCRIPT["episodes"]
+    ]

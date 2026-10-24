@@ -1,4 +1,5 @@
 import asyncio
+import json
 import time
 from typing import get_args
 
@@ -6,13 +7,14 @@ import pytest
 
 from app.clients.llm import call_groq, generate_with
 from app.config import get_settings
-from app.schemas.contract import CharacterId
+from app.schemas.contract import CharacterId, EpisodesRequest
 from app.schemas.script import EpisodeDraft
-from app.services import script_writer
+from app.services import pipeline, script_writer
 from app.services.grounding import normalize
 from app.services.narrator import narrate
 from app.services.pictures import find_picture
 from tests.conftest import SOURCE_TEXT
+from validate import check_stream_order, validator
 
 pytestmark = pytest.mark.live
 
@@ -82,3 +84,26 @@ async def test_live_pexels_finds_a_picture() -> None:
 
     assert picture is not None
     print(f"\npicture: {picture.url} ({picture.credit})")
+
+
+async def test_live_pipeline_streams_a_valid_course() -> None:
+    settings = get_settings()
+    if settings.gemini_api_key is None and settings.groq_api_key is None:
+        pytest.skip("GEMINI_API_KEY and GROQ_API_KEY are not set in backend/.env")
+    started = time.perf_counter()
+    first_scene_s = None
+    events = []
+
+    async for line in pipeline.stream_course(EpisodesRequest(source_text=SOURCE_TEXT, language="ru")):
+        event = json.loads(line)
+        events.append(event)
+        if event["type"] == "scene" and first_scene_s is None:
+            first_scene_s = time.perf_counter() - started
+
+    for event in events:
+        validator("StreamEvent").validate(event)
+    errors: list[str] = []
+    check_stream_order(errors, events)
+    assert errors == []
+    assert events[-1]["type"] == "done"
+    print(f"\nfirst scene after {first_scene_s:.1f}s, done after {time.perf_counter() - started:.1f}s")

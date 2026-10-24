@@ -1,40 +1,15 @@
-import json
 import re
 
 import pytest
 from pydantic import BaseModel
 
-from app.config import CONTRACTS_DIR
 from app.errors import LlmUnavailableError, RateLimitedError
-from app.schemas.script import EpisodeDraft, SceneFixes, ScriptScene
+from app.schemas.script import EpisodeDraft, SceneFixes
 from app.services import script_writer
 from app.services.grounding import normalize
-from tests.conftest import SOURCE_TEXT
+from tests.conftest import FIXTURE_SCRIPT, SOURCE_TEXT, fixture_drafts
 
-FIXTURE_SCRIPT = json.loads((CONTRACTS_DIR / "tools" / "fixture_script.json").read_text(encoding="utf-8"))
 EPISODE_NUMBER = re.compile(r"^Episode (\d+) of (\d+)\.", re.MULTILINE)
-
-
-def fixture_drafts() -> list[EpisodeDraft]:
-    return [
-        EpisodeDraft(
-            course_title=FIXTURE_SCRIPT["course_title"],
-            title=episode["title"],
-            scenes=[
-                ScriptScene(
-                    speaker=spec["speaker"],
-                    text=spec["text"],
-                    highlight=spec["highlight"],
-                    picture_query=spec.get("picture_query"),
-                    reaction=spec["reaction"],
-                    sfx=spec["sfx"],
-                    source_quote=spec["source_quote"],
-                )
-                for spec in episode["scenes"]
-            ],
-        )
-        for episode in FIXTURE_SCRIPT["episodes"]
-    ]
 
 
 class FakeLlm:

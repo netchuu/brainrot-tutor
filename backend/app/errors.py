@@ -1,4 +1,4 @@
-from app.schemas.contract import ErrorBody, ErrorCode
+from app.schemas.contract import ErrorBody, ErrorCode, ErrorEvent
 
 
 class AppError(Exception):
@@ -12,6 +12,14 @@ class AppError(Exception):
 
     def to_body(self) -> ErrorBody:
         return ErrorBody(code=self.code, message=self.message, retryable=self.retryable)
+
+    def to_event(self) -> ErrorEvent:
+        return ErrorEvent(type="error", code=self.code, message=self.message, retryable=self.retryable)
+
+
+class BadInputError(AppError):
+    code: ErrorCode = "bad_input"
+    status_code = 422
 
 
 class SourceTooLongError(AppError):

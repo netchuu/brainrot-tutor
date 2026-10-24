@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.errors import AppError
 from app.schemas.contract import ErrorBody, ErrorResponse
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 

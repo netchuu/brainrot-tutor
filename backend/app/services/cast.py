@@ -1,7 +1,7 @@
 import hashlib
 from dataclasses import dataclass
 
-from app.schemas.contract import BackgroundId, Cast, CharacterId, Language, TemplateId
+from app.schemas.contract import BackgroundId, Cast, CharacterId, Language, Speaker, TemplateId
 
 
 @dataclass(frozen=True)
@@ -47,3 +47,7 @@ def pick_background(seed: int, episode: int, template: TemplateId) -> Background
 def voice_for(character: CharacterId, language: Language) -> tuple[str, str, str]:
     voice = CHARACTER_VOICES[character]
     return (voice.ru if language == "ru" else voice.en), voice.pitch, voice.rate
+
+
+def character_for(cast: Cast, speaker: Speaker) -> CharacterId:
+    return cast.teacher if speaker == "teacher" else cast.student

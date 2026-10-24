@@ -88,14 +88,6 @@ async def test_source_over_configured_limit_is_too_long(
     assert response.json()["error"]["code"] == "too_long"
 
 
-async def test_stream_without_mock_flag_is_bad_input(client: httpx.AsyncClient) -> None:
-    response = await client.post(STREAM_URL, json=request_body())
-
-    assert response.status_code == 422
-    validator("ErrorResponse").validate(response.json())
-    assert response.json()["error"]["code"] == "bad_input"
-
-
 async def test_missing_fixture_is_internal_error_with_cors(
     client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
