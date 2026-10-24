@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mascotPose } from '@/templates/ParkourDuo/pose'
+import { mascotPose } from '@/templates/pose'
 import { fixtureScene } from '@/test/fixtureEvents'
 
 describe('mascotPose', () => {

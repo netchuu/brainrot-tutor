@@ -1,5 +1,5 @@
 import { MAX_PDF_BYTES, MAX_SOURCE_CHARS, MIN_SOURCE_CHARS } from '@/source'
-import type { ErrorCode } from '@/types/contract'
+import type { CharacterId, ErrorCode } from '@/types/contract'
 
 const numberFormat = new Intl.NumberFormat('ru-RU')
 const pluralRules = new Intl.PluralRules('ru-RU')
@@ -53,7 +53,53 @@ export const ru = {
     nextEpisode: 'Следующий эпизод',
     replay: 'Ещё раз',
     newText: 'Новый текст',
+    swipeHint: 'или смахни вверх',
   },
+  quiz: {
+    take: 'Пройти тест',
+    loading: 'Готовим тест…',
+    progress: (number: number, total: number) => `Вопрос ${String(number)} из ${String(total)}`,
+    correct: 'Верно!',
+    wrong: 'Не совсем',
+    fromText: 'Из текста',
+    replayScene: 'Пересмотреть сцену',
+    next: 'Дальше',
+    results: 'Результат',
+    check: 'Проверить',
+    skip: 'Пропустить вопрос',
+    skipped: 'Вопрос пропущен',
+    checking: 'Проверяем…',
+    answerPlaceholder: 'Напиши ответ своими словами…',
+    reference: 'Эталонный ответ',
+    scorePercent: (score: number) => `Оценка: ${String(Math.round(Math.min(1, Math.max(0, score)) * 100))}%`,
+    summary: (correct: number, total: number) => `Правильно ${String(correct)} из ${String(total)}`,
+    backToQuiz: 'Назад к тесту',
+    sceneReplayed: 'Сцена пересмотрена',
+    rewatch: 'Пересмотреть эпизод',
+  },
+  tutor: {
+    open: 'Спросить репетитора',
+    title: 'Репетитор',
+    subtitle: 'Отвечает только по твоему тексту',
+    placeholder: 'Спроси что-нибудь по тексту…',
+    send: 'Отправить',
+    typing: 'Печатает…',
+    sources: (count: number) => `Из текста (${String(count)})`,
+    suggestions: ['Объясни проще', 'Приведи пример из жизни', 'Что здесь самое важное?'],
+    back: 'Назад',
+  },
+  chat: {
+    title: (teacher: string, student: string) => `${teacher} и ${student}`,
+    online: 'в сети',
+  },
+  characters: {
+    professor: 'Профессор',
+    mechanic: 'Механик',
+    robot: 'Робот',
+    kid: 'Малой',
+    gamer: 'Геймер',
+    cat: 'Кот',
+  } satisfies Record<CharacterId, string>,
   stage: {
     cooking: 'готовим…',
     tapForSound: 'Нажми, чтобы включить звук',
@@ -67,8 +113,8 @@ export const ru = {
     llm_unavailable: 'ИИ сейчас недоступен, попробуй ещё раз.',
     internal: 'На сервере что-то сломалось. Попробуй ещё раз.',
     network: 'Нет связи с сервером. Проверь интернет и попробуй снова.',
-    broken: 'Поток уроков оборвался. Попробуй ещё раз.',
+    broken: 'Ответ сервера оборвался. Попробуй ещё раз.',
     timeout: 'Сервер долго молчит. Попробуй ещё раз.',
-    unknown: 'Что-то пошло не так при создании урока.',
+    unknown: 'Что-то пошло не так. Попробуй ещё раз.',
   } satisfies Record<FailureKind, string>,
 }

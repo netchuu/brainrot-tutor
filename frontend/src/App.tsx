@@ -23,6 +23,7 @@ export function App() {
     <Feed
       key={generation}
       state={state}
+      request={request}
       onRetry={() => {
         run(request)
       }}

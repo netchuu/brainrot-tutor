@@ -1,6 +1,7 @@
 import fixtureText from '../../../contracts/fixtures/episode-stream.ndjson?raw'
-import { isStreamEvent } from '@/api/guards'
-import type { Scene, StreamEvent } from '@/types/contract'
+import quizText from '../../../contracts/fixtures/quiz.json?raw'
+import { isQuizResponse, isStreamEvent } from '@/api/guards'
+import type { QuizResponse, Scene, StreamEvent } from '@/types/contract'
 
 export const FIXTURE_TEXT = fixtureText
 
@@ -22,4 +23,13 @@ export function fixtureScene(id: string): Scene {
     if (event.type === 'scene' && event.scene.id === id) return event.scene
   }
   throw new Error(`Fixture has no scene ${id}`)
+}
+
+export const QUIZ_TEXT = quizText
+
+export const fixtureQuizValue: unknown = JSON.parse(quizText)
+
+export function fixtureQuiz(): QuizResponse {
+  if (!isQuizResponse(fixtureQuizValue)) throw new Error('quiz.json does not match the contract')
+  return fixtureQuizValue
 }

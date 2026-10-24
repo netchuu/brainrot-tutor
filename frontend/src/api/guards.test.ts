@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { isErrorResponse, isStreamEvent } from '@/api/guards'
-import { fixtureLines, fixtureScene } from '@/test/fixtureEvents'
+import { isErrorResponse, isGradeResponse, isQuizResponse, isStreamEvent, isTutorEvent } from '@/api/guards'
+import gradeText from '../../../contracts/fixtures/grade.json?raw'
+import tutorText from '../../../contracts/fixtures/tutor-stream.ndjson?raw'
+import { fixtureLines, fixtureQuiz, fixtureQuizValue, fixtureScene } from '@/test/fixtureEvents'
+
+const GRADE_TEXT = gradeText
+const TUTOR_TEXT = tutorText
 
 const scene = fixtureScene('e0s0')
 
@@ -85,5 +90,64 @@ describe('isErrorResponse', () => {
   it('accepts the contract error body and rejects others', () => {
     expect(isErrorResponse({ error: { code: 'too_long', message: 'x', retryable: false } })).toBe(true)
     expect(isErrorResponse({ detail: 'Not Found' })).toBe(false)
+  })
+})
+
+describe('isQuizResponse', () => {
+  const quiz = fixtureQuiz()
+  const [choice, , , open] = quiz.questions
+
+  function withQuestion(question: unknown): unknown {
+    return { ...quiz, questions: [question, ...quiz.questions.slice(1)] }
+  }
+
+  it('accepts the quiz fixture', () => {
+    expect(isQuizResponse(fixtureQuizValue)).toBe(true)
+  })
+
+  it('rejects fewer than 3 or more than 5 questions and duplicate ids', () => {
+    expect(isQuizResponse({ ...quiz, questions: quiz.questions.slice(0, 2) })).toBe(false)
+    expect(isQuizResponse({ ...quiz, questions: [...quiz.questions, { ...choice, id: 'q5' }, { ...choice, id: 'q6' }] })).toBe(
+      false,
+    )
+    expect(isQuizResponse({ ...quiz, questions: [choice, choice, open] })).toBe(false)
+  })
+
+  it.each([
+    ['three options', { ...choice, options: ['a', 'b', 'c'] }],
+    ['answer_index 4', { ...choice, answer_index: 4 }],
+    ['a non-integer answer_index', { ...choice, answer_index: 1.5 }],
+    ['an open question without reference_answer', { ...open, reference_answer: undefined }],
+    ['an unknown kind', { ...choice, kind: 'multiple_choice' }],
+    ['a numeric scene_id', { ...choice, scene_id: 3 }],
+  ])('rejects %s', (_, question) => {
+    expect(isQuizResponse(withQuestion(question))).toBe(false)
+  })
+})
+
+describe('isGradeResponse', () => {
+  it('accepts the grade fixture and the contract body, and rejects others', () => {
+    expect(isGradeResponse(JSON.parse(GRADE_TEXT))).toBe(true)
+    expect(isGradeResponse({ correct: true, score: 0.8, feedback: 'Верно' })).toBe(true)
+    expect(isGradeResponse({ correct: 'yes', score: 0.8, feedback: 'Верно' })).toBe(false)
+    expect(isGradeResponse({ correct: true, score: Number.NaN, feedback: 'Верно' })).toBe(false)
+    expect(isGradeResponse({ correct: true, score: 1.5, feedback: 'Верно' })).toBe(false)
+    expect(isGradeResponse({ correct: false, score: -0.1, feedback: 'Нет' })).toBe(false)
+    expect(isGradeResponse({ correct: true, score: 0.8 })).toBe(false)
+  })
+})
+
+describe('isTutorEvent', () => {
+  it('accepts every line of the tutor fixture', () => {
+    const lines = TUTOR_TEXT.split('\n').filter((line) => line.trim() !== '')
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.every((line) => isTutorEvent(JSON.parse(line)))).toBe(true)
+  })
+
+  it('accepts an error event and rejects other shapes', () => {
+    expect(isTutorEvent({ type: 'error', code: 'llm_unavailable', message: 'x', retryable: true })).toBe(true)
+    expect(isTutorEvent({ type: 'delta', text: 5 })).toBe(false)
+    expect(isTutorEvent({ type: 'done', source_quotes: [1] })).toBe(false)
+    expect(isTutorEvent({ type: 'plan' })).toBe(false)
   })
 })

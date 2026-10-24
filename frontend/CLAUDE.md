@@ -29,13 +29,17 @@ You own `frontend/` except `frontend/public/assets/`, which the content lead fil
 ### Architecture
 ```
 frontend/src/
-  api/         client.ts (fetch + NDJSON stream reader, errors), fixtures.ts (VITE_USE_FIXTURES)
-  player/      Stage.tsx (9:16 frame, layers)  usePlayback.ts (scene clock)  captions.ts (2–3 word chunks)  sfx.ts
-  templates/   registry.ts  ParkourDuo/  SplitScreen/  FakeChat/  Top3Countdown/  MythOrFact/
+  api/         client.ts (fetch, NDJSON streams, JSON calls, errors)  guards.ts  failure.ts (Russian error copy by kind)  fixtures.ts (VITE_USE_FIXTURES)
+  player/      Stage.tsx (9:16 frame, layers)  usePlayback.ts (scene clock)  captions.ts (2–3 word chunks)  sfx.ts  useEpisodeStream.ts  useSwipe.ts
+  templates/   registry.ts  types.ts  shared.tsx  pose.ts  ParkourDuo/  SplitScreen/  FakeChat/  Top3Countdown/  MythOrFact/
+  quiz/        session.ts (answers, score)  useQuizzes.ts (prefetch per episode)  QuestionCard.tsx
+  tutor/       useTutor.ts (chat state, streaming)
   screens/     Upload.tsx  Feed.tsx  Quiz.tsx  Tutor.tsx
-  pdf/         extractText.ts (pdfjs-dist)
+  pdf/         extractText.ts (pdfjs-dist legacy build)
   types/       contract.ts
-  assets.ts    names of files in public/assets, matching docs/PLAN.md and the Reaction/Sfx enums
+  source.ts    source text limits and language detection
+  strings.ts   all Russian UI copy
+  assets.ts    names of files in public/assets, matching contracts/api.md (CharacterId, BackgroundId, Reaction, Sfx)
 ```
 - A template is a component that receives the current scene, the playback time and the episode; it never hardcodes lesson text. `registry.ts` maps `TemplateId` to the component.
 
@@ -56,7 +60,7 @@ frontend/src/
 
 ### Config
 - Dev: Vite proxy `/api` → `http://localhost:8000`. Prod: `VITE_API_URL`
-- `VITE_USE_FIXTURES=1`: read `contracts/fixtures/episode-stream.ndjson`, `quiz.json`, `tutor-stream.ndjson` via `?raw` imports (allow `../contracts` in `server.fs.allow`) and replay them with 300 ms between events
+- `VITE_USE_FIXTURES=1`: read `contracts/fixtures/episode-stream.ndjson`, `quiz.json`, `grade.json`, `tutor-stream.ndjson` and `source.txt` via `?raw` imports (allow `../contracts` in `server.fs.allow`); streams replay with 300 ms (episodes) or 150 ms (tutor) between events
 
 ### Checks (run before saying done)
 ```bash

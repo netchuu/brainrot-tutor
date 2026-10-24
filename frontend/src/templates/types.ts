@@ -6,9 +6,14 @@ export interface TemplateProps {
   scene: Scene
   sceneIndex: number
   timeMs: number
+  history: readonly Scene[]
 }
 
 export interface TemplateDefinition {
   component: ComponentType<TemplateProps>
   preload: (episode: EpisodeOutline) => string[]
+  prepare?: () => void
+  backgroundArea: BackgroundArea
 }
+
+export type BackgroundArea = 'full' | 'bottom'

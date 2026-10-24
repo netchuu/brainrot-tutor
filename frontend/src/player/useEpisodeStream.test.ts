@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, ContractError, StreamParseError, StreamTimeoutError } from '@/api/client'
-import { initialStreamState, streamReducer, toFailure, useEpisodeStream } from '@/player/useEpisodeStream'
+import { ApiError, ContractError, RequestTimeoutError, StreamParseError, StreamTimeoutError } from '@/api/client'
+import { toFailure } from '@/api/failure'
+import { initialStreamState, streamReducer, useEpisodeStream } from '@/player/useEpisodeStream'
 import { ru } from '@/strings'
 import { FIXTURE_TEXT, fixtureEvents } from '@/test/fixtureEvents'
 import type { EpisodesRequest } from '@/types/contract'
@@ -54,6 +55,7 @@ describe('toFailure', () => {
     [new ApiError('too_long', 'Text is too long', false), 'too_long', false],
     [new ApiError('rate_limited', 'slow down', true), 'rate_limited', true],
     [new StreamTimeoutError('silent'), 'timeout', true],
+    [new RequestTimeoutError('slow quiz'), 'timeout', true],
     [new ContractError('internal detail'), 'broken', true],
     [new StreamParseError('bad line'), 'broken', true],
     [new TypeError('Load failed'), 'network', true],

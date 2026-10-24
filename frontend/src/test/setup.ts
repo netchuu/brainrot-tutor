@@ -15,8 +15,15 @@ if (!('ResizeObserver' in globalThis)) {
     },
   })
 }
+if (!('scrollTo' in Element.prototype)) {
+  Object.defineProperty(Element.prototype, 'scrollTo', {
+    value() {
+      return undefined
+    },
+  })
+}
 if (!('fonts' in document)) {
-  Object.defineProperty(document, 'fonts', { value: { ready: Promise.resolve() } })
+  Object.defineProperty(document, 'fonts', { value: { ready: Promise.resolve(), load: () => Promise.resolve([]) } })
 }
 
 afterEach(() => {

@@ -14,9 +14,14 @@ import type {
   Cast,
   EpisodeOutline,
   ErrorResponse,
+  GradeResponse,
+  OpenQuestion,
   Picture,
+  QuizResponse,
   Scene,
+  SingleChoiceQuestion,
   StreamEvent,
+  TutorEvent,
   Word,
 } from '@/types/contract'
 
@@ -119,7 +124,25 @@ export function isStreamEvent(value: unknown): value is StreamEvent {
     case 'done':
       return isNonNegativeInteger(value.elapsed_ms)
     case 'error':
-      return isOneOf(ERROR_CODES, value.code) && isString(value.message) && typeof value.retryable === 'boolean'
+      return isErrorEvent(value)
+    default:
+      return false
+  }
+}
+
+function isErrorEvent(value: JsonObject): boolean {
+  return isOneOf(ERROR_CODES, value.code) && isString(value.message) && typeof value.retryable === 'boolean'
+}
+
+export function isTutorEvent(value: unknown): value is TutorEvent {
+  if (!isObject(value)) return false
+  switch (value.type) {
+    case 'delta':
+      return isString(value.text)
+    case 'done':
+      return Array.isArray(value.source_quotes) && value.source_quotes.every(isString)
+    case 'error':
+      return isErrorEvent(value)
     default:
       return false
   }
@@ -129,4 +152,59 @@ export function isErrorResponse(value: unknown): value is ErrorResponse {
   if (!isObject(value) || !isObject(value.error)) return false
   const { code, message, retryable } = value.error
   return isOneOf(ERROR_CODES, code) && isString(message) && typeof retryable === 'boolean'
+}
+
+function isAnswerIndex(value: unknown): value is SingleChoiceQuestion['answer_index'] {
+  return value === 0 || value === 1 || value === 2 || value === 3
+}
+
+function isSingleChoiceQuestion(value: unknown): value is SingleChoiceQuestion {
+  return (
+    isObject(value) &&
+    value.kind === 'single_choice' &&
+    isString(value.id) &&
+    isString(value.prompt) &&
+    Array.isArray(value.options) &&
+    value.options.length === 4 &&
+    value.options.every(isString) &&
+    isAnswerIndex(value.answer_index) &&
+    isString(value.explanation) &&
+    isString(value.source_quote) &&
+    isNullable(value.scene_id, isString)
+  )
+}
+
+function isOpenQuestion(value: unknown): value is OpenQuestion {
+  return (
+    isObject(value) &&
+    value.kind === 'open' &&
+    isString(value.id) &&
+    isString(value.prompt) &&
+    isString(value.reference_answer) &&
+    isString(value.source_quote) &&
+    isNullable(value.scene_id, isString)
+  )
+}
+
+const MIN_QUESTIONS = 3
+const MAX_QUESTIONS = 5
+
+// Answers are stored by question id, so the count and uniqueness rules are needed to render the quiz at all.
+export function isQuizResponse(value: unknown): value is QuizResponse {
+  if (!isObject(value) || !isNonNegativeInteger(value.episode) || !Array.isArray(value.questions)) return false
+  const questions: unknown[] = value.questions
+  if (questions.length < MIN_QUESTIONS || questions.length > MAX_QUESTIONS) return false
+  if (!questions.every((question) => isSingleChoiceQuestion(question) || isOpenQuestion(question))) return false
+  return new Set(questions.map((question) => (isObject(question) ? question.id : null))).size === questions.length
+}
+
+export function isGradeResponse(value: unknown): value is GradeResponse {
+  return (
+    isObject(value) &&
+    typeof value.correct === 'boolean' &&
+    typeof value.score === 'number' &&
+    value.score >= 0 &&
+    value.score <= 1 &&
+    isString(value.feedback)
+  )
 }

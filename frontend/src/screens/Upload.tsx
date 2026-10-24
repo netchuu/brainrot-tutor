@@ -6,11 +6,9 @@ import { preloadSfx } from '@/player/sfx'
 import { detectLanguage, MIN_SOURCE_CHARS, prepareSource } from '@/source'
 import { ru } from '@/strings'
 import { LANGUAGES } from '@/types/contract'
-import type { EpisodesRequest, Language, TemplateId } from '@/types/contract'
+import type { EpisodesRequest, Language } from '@/types/contract'
 
 const EPISODE_COUNT = 3
-// Parkour Duo is the only built template; send null (AI picks) once Split Screen exists.
-const FORCED_TEMPLATE: TemplateId = 'parkour_duo'
 
 type PdfState =
   | { status: 'idle' }
@@ -76,7 +74,7 @@ export function Upload({ initial, onGenerate }: UploadProps) {
     if (source.tooShort || reading) return
     unlockAudio()
     void preloadSfx()
-    onGenerate({ source_text: source.text, language, episode_count: EPISODE_COUNT, template: FORCED_TEMPLATE })
+    onGenerate({ source_text: source.text, language, episode_count: EPISODE_COUNT, template: null })
   }
 
   return (

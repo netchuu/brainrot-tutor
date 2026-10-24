@@ -11,7 +11,7 @@ const episode: EpisodeOutline = plan.episodes[0]
 const brainAt = wordStart(fixtureScene('e0s0'), 'мозг')
 
 function renderScene(scene: Scene, timeMs: number) {
-  return render(<ParkourDuo episode={episode} scene={scene} sceneIndex={0} timeMs={timeMs} />)
+  return render(<ParkourDuo episode={episode} scene={scene} sceneIndex={0} timeMs={timeMs} history={[]} />)
 }
 
 describe('ParkourDuo', () => {
@@ -44,7 +44,7 @@ describe('ParkourDuo', () => {
     const { rerender } = renderScene(fixtureScene('e0s0'), 300)
     expect(screen.getByTestId('mascot-teacher')).toHaveAttribute('data-active', 'true')
     expect(screen.getByTestId('mascot-student')).toHaveAttribute('data-active', 'false')
-    rerender(<ParkourDuo episode={episode} scene={fixtureScene('e0s1')} sceneIndex={1} timeMs={300} />)
+    rerender(<ParkourDuo episode={episode} scene={fixtureScene('e0s1')} sceneIndex={1} timeMs={300} history={[]} />)
     expect(screen.getByTestId('mascot-student')).toHaveAttribute('data-active', 'true')
     expect(screen.getByTestId('mascot-teacher')).toHaveAttribute('data-active', 'false')
   })
@@ -52,7 +52,7 @@ describe('ParkourDuo', () => {
   it('pops the reaction sticker when the highlight word starts', () => {
     const { rerender } = renderScene(fixtureScene('e0s0'), brainAt - 1)
     expect(screen.queryByTestId('reaction')).not.toBeInTheDocument()
-    rerender(<ParkourDuo episode={episode} scene={fixtureScene('e0s0')} sceneIndex={0} timeMs={brainAt} />)
+    rerender(<ParkourDuo episode={episode} scene={fixtureScene('e0s0')} sceneIndex={0} timeMs={brainAt} history={[]} />)
     expect(screen.getByTestId('reaction')).toBeInTheDocument()
   })
 
@@ -83,6 +83,7 @@ describe('ParkourDuo', () => {
         scene={{ ...fixtureScene('e0s1'), highlight: null, term: null }}
         sceneIndex={1}
         timeMs={300}
+        history={[]}
       />,
     )
     expect(screen.getByTestId('picture-fallback')).toHaveTextContent('🤔')

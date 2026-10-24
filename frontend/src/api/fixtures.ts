@@ -1,6 +1,7 @@
 export const USE_FIXTURES = import.meta.env.VITE_USE_FIXTURES === '1'
 
 const EVENT_GAP_MS = 300
+const TUTOR_GAP_MS = 150
 
 export class FixtureModeError extends Error {
   override name = 'FixtureModeError'
@@ -17,6 +18,24 @@ export async function fixtureSourceText(): Promise<string> {
   if (!USE_FIXTURES) throw new FixtureModeError('Fixture mode is off')
   const { default: sourceText } = await import('../../../contracts/fixtures/source.txt?raw')
   return sourceText
+}
+
+export async function fixtureQuizText(): Promise<string> {
+  if (!USE_FIXTURES) throw new FixtureModeError('Fixture mode is off')
+  const { default: text } = await import('../../../contracts/fixtures/quiz.json?raw')
+  return text
+}
+
+export async function fixtureTutorStream(signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {
+  if (!USE_FIXTURES) throw new FixtureModeError('Fixture mode is off')
+  const { default: text } = await import('../../../contracts/fixtures/tutor-stream.ndjson?raw')
+  return replayLines(text, signal, TUTOR_GAP_MS)
+}
+
+export async function fixtureGradeText(): Promise<string> {
+  if (!USE_FIXTURES) throw new FixtureModeError('Fixture mode is off')
+  const { default: text } = await import('../../../contracts/fixtures/grade.json?raw')
+  return text
 }
 
 export function replayLines(text: string, signal: AbortSignal, gapMs: number): ReadableStream<Uint8Array> {

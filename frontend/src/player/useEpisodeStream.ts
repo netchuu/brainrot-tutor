@@ -1,18 +1,10 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
-import { ApiError, ContractError, StreamParseError, StreamTimeoutError, streamEpisodes } from '@/api/client'
-import { ru } from '@/strings'
-import type { FailureKind } from '@/strings'
+import { streamEpisodes } from '@/api/client'
+import { failure, toFailure } from '@/api/failure'
+import type { Failure } from '@/api/failure'
 import type { EpisodesRequest, PlanEvent, Scene, StreamEvent } from '@/types/contract'
 
-export interface StreamFailure {
-  kind: FailureKind
-  message: string
-  retryable: boolean
-}
-
-function failure(kind: FailureKind, retryable: boolean): StreamFailure {
-  return { kind, message: ru.errors[kind], retryable }
-}
+export type StreamFailure = Failure
 
 export interface StreamState {
   status: 'idle' | 'streaming' | 'done' | 'failed'
@@ -76,14 +68,6 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
     case 'failed':
       return { ...state, status: 'failed', error: action.error }
   }
-}
-
-export function toFailure(error: unknown): StreamFailure {
-  if (error instanceof ApiError) return failure(error.code, error.retryable)
-  if (error instanceof StreamTimeoutError) return failure('timeout', true)
-  if (error instanceof ContractError || error instanceof StreamParseError) return failure('broken', true)
-  if (error instanceof TypeError) return failure('network', true)
-  return failure('unknown', true)
 }
 
 async function consume(request: EpisodesRequest, signal: AbortSignal, dispatch: (action: StreamAction) => void) {

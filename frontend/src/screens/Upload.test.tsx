@@ -51,7 +51,7 @@ describe('Upload', () => {
     render(<Upload initial={null} onGenerate={onGenerate} />)
     typeText(`  ${RUSSIAN}  `)
     fireEvent.click(generateButton())
-    expect(lastRequest()).toEqual({ source_text: RUSSIAN, language: 'ru', episode_count: 3, template: 'parkour_duo' })
+    expect(lastRequest()).toEqual({ source_text: RUSSIAN, language: 'ru', episode_count: 3, template: null })
     const unlockOrder = vi.mocked(unlockAudio).mock.invocationCallOrder[0] ?? Infinity
     const generateOrder = onGenerate.mock.invocationCallOrder[0] ?? -Infinity
     expect(unlockOrder).toBeLessThan(generateOrder)

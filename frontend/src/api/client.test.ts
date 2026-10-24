@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readNdjson, StreamParseError } from '@/api/client'
+import { QUIZ_TEXT } from '@/test/fixtureEvents'
 import type { EpisodesRequest } from '@/types/contract'
 
 const encoder = new TextEncoder()
@@ -214,6 +215,108 @@ describe('streamEpisodes', () => {
     await vi.advanceTimersByTimeAsync(2000)
     await assertion
     expect(lastEventAt - startedAt).toBe(900)
+  })
+
+  it('posts the quiz request and returns the guarded quiz', async () => {
+    const quiz: unknown = JSON.parse(QUIZ_TEXT)
+    const fetchMock = respondWith(new Response(JSON.stringify(quiz), { headers: { 'Content-Type': 'application/json' } }))
+    const { client } = await load()
+    const quizRequest = {
+      source_text: 'x'.repeat(300),
+      language: 'ru' as const,
+      question_count: 4,
+      episode: { index: 0, title: 'Эпизод', scenes: [{ id: 'e0s0', text: 'Текст', source_quote: null }] },
+    }
+    expect(await client.fetchQuiz(quizRequest, new AbortController().signal)).toEqual(quiz)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/quiz',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(quizRequest) }),
+    )
+  })
+
+  it('posts an open answer for grading and rejects a body that breaks the contract', async () => {
+    const gradeRequest = {
+      language: 'ru' as const,
+      question: {
+        id: 'q4',
+        kind: 'open' as const,
+        prompt: 'Что решает ЭБУ?',
+        reference_answer: 'Сколько топлива впрыснуть',
+        source_quote: 'По этим данным блок решает',
+        scene_id: 'e0s2',
+      },
+      answer: 'Сколько топлива',
+    }
+    const fetchMock = respondWith(new Response('{"correct":true,"score":0.9,"feedback":"Верно"}'))
+    const { client } = await load()
+    expect(await client.gradeOpenAnswer(gradeRequest, new AbortController().signal)).toEqual({
+      correct: true,
+      score: 0.9,
+      feedback: 'Верно',
+    })
+    expect(fetchMock).toHaveBeenCalledWith('/api/quiz/grade', expect.objectContaining({ body: JSON.stringify(gradeRequest) }))
+    respondWith(new Response('{"correct":"maybe"}'))
+    await expect(client.gradeOpenAnswer(gradeRequest, new AbortController().signal)).rejects.toBeInstanceOf(
+      client.ContractError,
+    )
+    respondWith(new Response('<html>oops</html>'))
+    await expect(client.gradeOpenAnswer(gradeRequest, new AbortController().signal)).rejects.toBeInstanceOf(
+      client.ContractError,
+    )
+  })
+
+  it('maps a quiz ErrorResponse to ApiError and times out a silent server', async () => {
+    const body = JSON.stringify({ error: { code: 'llm_unavailable', message: 'down', retryable: true } })
+    respondWith(new Response(body, { status: 503 }))
+    const { client } = await load()
+    const quizRequest = {
+      source_text: 'x'.repeat(300),
+      language: 'ru' as const,
+      episode: { index: 0, title: 'Эпизод', scenes: [{ id: 'e0s0', text: 'Текст', source_quote: null }] },
+    }
+    await expect(client.fetchQuiz(quizRequest, new AbortController().signal)).rejects.toMatchObject({
+      code: 'llm_unavailable',
+      retryable: true,
+    })
+
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_: string, init?: RequestInit) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => {
+              reject(new DOMException('aborted', 'AbortError'))
+            })
+          }),
+      ),
+    )
+    const pending = client.fetchQuiz(quizRequest, new AbortController().signal, 1000)
+    const assertion = expect(pending).rejects.toBeInstanceOf(client.RequestTimeoutError)
+    await vi.advanceTimersByTimeAsync(1000)
+    await assertion
+  })
+
+  it('streams tutor deltas and the closing quotes', async () => {
+    const lines = [
+      '{"type":"delta","text":"Ответ "}',
+      '{"type":"delta","text":"из текста"}',
+      '{"type":"done","source_quotes":["Цитата"]}',
+    ]
+    const fetchMock = respondWith(new Response(`${lines.join('\n')}\n`))
+    const { client } = await load()
+    const tutorRequest = {
+      source_text: 'x'.repeat(300),
+      language: 'ru' as const,
+      messages: [{ role: 'user' as const, content: 'Вопрос' }],
+    }
+    const events = await collect(client.streamTutor(tutorRequest, new AbortController().signal))
+    expect(events.map((event) => event.type)).toEqual(['delta', 'delta', 'done'])
+    expect(fetchMock).toHaveBeenCalledWith('/api/tutor', expect.objectContaining({ body: JSON.stringify(tutorRequest) }))
+    respondWith(new Response('{"type":"delta","text":"обрыв"}\n'))
+    await expect(collect(client.streamTutor(tutorRequest, new AbortController().signal))).rejects.toBeInstanceOf(
+      client.ContractError,
+    )
   })
 
   it('throws ContractError on events before the plan or outside it', async () => {

@@ -7,6 +7,7 @@
   --animate-pop: pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
   --animate-bob: bob 0.45s ease-in-out infinite alternate;
   --animate-pan: pan 8s ease-in-out infinite alternate;
+  --animate-enter: enter 0.35s ease-out both;
 
   @keyframes pop {
     0% {
@@ -27,6 +28,17 @@
     }
     to {
       translate: 0 -4%;
+    }
+  }
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      translate: 0 8%;
+    }
+    to {
+      opacity: 1;
+      translate: 0 0;
     }
   }
 
