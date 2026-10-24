@@ -17,3 +17,4 @@ One line per decision: date · decision · why.
 - 2026-10-24 · `contracts/fixtures/grade.json` added (GradeResponse for quiz q4) · lets fixture mode grade the open question without a backend
 - 2026-10-24 · A source_quote must be 20–500 characters, at least 4 words and match the source at word boundaries; quiz and grade calls end at 50 s · single terms, list numbers or mid-word fragments no longer count as proof, and slow AI calls return the contract error instead of a Vercel 504
 - 2026-10-24 · Grading trusts the question, reference answer and quote that the client sends · the backend is stateless; a learner can only inflate their own score
+- 2026-10-24 · Quiz and grade requests have length limits (≤ 8 scenes, title ≤ 200, scene text ≤ 220, quotes and open-question fields ≤ 500, answer ≤ 1,000) · stops oversized requests from burning the shared free LLM quota; the backend's own output always fits

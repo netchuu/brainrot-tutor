@@ -25,9 +25,9 @@ MIN_QUESTIONS = 3
 OPTION_COUNT = 4
 EXCERPT_RADIUS = 600
 FALLBACK_EXCERPT_CHARS = 4000
-# The request schema has no length limits on these fields, so the prompt caps what it forwards.
-PROMPT_SCENES = 12
-PROMPT_FIELD_CHARS = 600
+OPEN_FIELD_CHARS = 500
+# Scene ids have no schema limit, so the prompt forwards only a short prefix.
+PROMPT_ID_CHARS = 20
 # Vercel stops the function at 60 s; a repair only starts while it can still finish in time.
 QUIZ_DEADLINE_S = 50
 REPAIR_CUTOFF_S = 25
@@ -107,6 +107,8 @@ def check_question(
         reference = normalize(draft.reference_answer or "")
         if not reference:
             problems.append("an open question needs a reference_answer")
+        if len(prompt) > OPEN_FIELD_CHARS or len(reference) > OPEN_FIELD_CHARS:
+            problems.append("keep the prompt and the reference_answer of an open question under 500 characters each")
         if any(question.kind == "open" for question in kept):
             problems.append("only one open question is allowed; make this a single_choice question")
         if problems or quote is None:
@@ -166,10 +168,9 @@ async def write_quiz(request: QuizRequest) -> QuizResponse:
     scene_ids = {scene.id for scene in scenes}
     system = SYSTEM_PROMPT.substitute(language_name=LANGUAGE_NAMES[request.language])
     context = {
-        "title": defang(request.episode.title[:PROMPT_FIELD_CHARS]),
+        "title": defang(request.episode.title),
         "scenes": "\n".join(
-            f"- {defang(scene.id[:20])}: {defang(normalize(scene.text)[:PROMPT_FIELD_CHARS])}"
-            for scene in scenes[:PROMPT_SCENES]
+            f"- {defang(scene.id[:PROMPT_ID_CHARS])}: {defang(normalize(scene.text))}" for scene in scenes
         ),
         "excerpt": defang(excerpt_for(source, scenes)),
     }

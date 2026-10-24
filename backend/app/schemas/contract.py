@@ -123,14 +123,14 @@ class EpisodesRequest(ContractModel):
 
 class QuizSceneRef(ContractModel):
     id: str
-    text: str
-    source_quote: str | None
+    text: str = Field(max_length=220)
+    source_quote: Annotated[str, Field(max_length=500)] | None
 
 
 class QuizEpisode(ContractModel):
     index: int = Field(ge=0)
-    title: str
-    scenes: list[QuizSceneRef] = Field(min_length=1)
+    title: str = Field(max_length=200)
+    scenes: list[QuizSceneRef] = Field(min_length=1, max_length=8)
 
 
 class QuizRequest(ContractModel):
@@ -154,9 +154,9 @@ class SingleChoiceQuestion(ContractModel):
 class OpenQuestion(ContractModel):
     id: str
     kind: Literal["open"]
-    prompt: str = Field(min_length=1)
-    reference_answer: str = Field(min_length=1)
-    source_quote: str = Field(min_length=1)
+    prompt: str = Field(min_length=1, max_length=500)
+    reference_answer: str = Field(min_length=1, max_length=500)
+    source_quote: str = Field(min_length=1, max_length=500)
     scene_id: str | None
 
 

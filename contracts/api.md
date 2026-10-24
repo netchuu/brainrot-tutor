@@ -83,7 +83,7 @@ Rules the backend guarantees:
 
 ## POST /api/quiz
 
-Request [`QuizRequest`]: source text, language, `question_count` (3–5, default 4) and the episode's scenes (`id`, `text`, `source_quote`).
+Request [`QuizRequest`]: source text, language, `question_count` (3–5, default 4) and the episode's scenes (`id`, `text`, `source_quote`). Limits: at most 8 scenes, `title` ≤ 200 characters, scene `text` ≤ 220, scene `source_quote` ≤ 500 (the episode stream's own values always fit).
 
 Response [`QuizResponse`]: 3–5 questions, at most one `open`.
 
@@ -98,7 +98,7 @@ The answer is included on purpose: grading single-choice happens in the browser.
 
 ## POST /api/quiz/grade
 
-Request [`GradeRequest`]: `{"language": "ru", "question": <OpenQuestion>, "answer": "…"}`
+Request [`GradeRequest`]: `{"language": "ru", "question": <OpenQuestion>, "answer": "…"}`. Limits: `answer` ≤ 1,000 characters; the open question's `prompt`, `reference_answer` and `source_quote` ≤ 500 each (the quiz's own values always fit).
 Response [`GradeResponse`]: `{"correct": true, "score": 0.8, "feedback": "…"}`. `correct` is `score >= 0.6`.
 
 Fixture: `fixtures/grade.json` is the response for the open question `q4` of `fixtures/quiz.json`.

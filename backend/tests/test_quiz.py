@@ -462,3 +462,46 @@ async def test_blank_answer_is_bad_input_without_an_llm_call(
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "bad_input"
     assert fake.calls == []
+
+
+@pytest.mark.parametrize(
+    ("change", "field"),
+    [
+        ({"title": "т" * 201}, "title"),
+        ({"scenes": [EPISODE_SCENES[0].model_dump()] * 9}, "scenes"),
+        ({"scenes": [{**EPISODE_SCENES[0].model_dump(), "text": "т" * 221}]}, "text"),
+        ({"scenes": [{**EPISODE_SCENES[0].model_dump(), "source_quote": "т" * 501}]}, "source_quote"),
+    ],
+    ids=["title", "nine-scenes", "scene-text", "scene-quote"],
+)
+async def test_quiz_route_enforces_episode_limits(
+    client: httpx.AsyncClient, change: dict[str, Any], field: str
+) -> None:
+    body = REQUEST.model_dump()
+    body["episode"] = {**body["episode"], **change}
+
+    response = await client.post("/api/quiz", json=body)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "bad_input"
+    assert field in response.json()["error"]["message"]
+
+
+@pytest.mark.parametrize("field", ["prompt", "reference_answer", "source_quote"])
+async def test_grade_route_enforces_open_question_limits(client: httpx.AsyncClient, field: str) -> None:
+    body = GRADE_REQUEST.model_dump()
+    body["question"] = {**body["question"], field: "т" * 501}
+
+    response = await client.post("/api/quiz/grade", json=body)
+
+    assert response.status_code == 422
+    assert field in response.json()["error"]["message"]
+
+
+async def test_overlong_open_question_is_not_returned(monkeypatch: pytest.MonkeyPatch) -> None:
+    drafts = with_question(fixture_drafts(), 3, reference_answer="Сколько топлива впрыснуть. " * 25)
+    install(monkeypatch, FakeLlm(QuizDraft(questions=drafts), LlmUnavailableError("down")))
+
+    quiz = await quiz_maker.make_quiz(REQUEST)
+
+    assert [question.kind for question in quiz.questions] == ["single_choice"] * 3

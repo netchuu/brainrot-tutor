@@ -14,15 +14,14 @@ ANSWER_PROMPT = Template((PROMPTS_DIR / "grade_answer.md").read_text(encoding="u
 PASS_SCORE = 0.6
 # Vercel stops the function at 60 s; answering earlier keeps the contract error shape.
 GRADE_DEADLINE_S = 50
-PROMPT_FIELD_CHARS = 1000
 
 
 async def grade_answer(request: GradeRequest) -> GradeResponse:
     system = SYSTEM_PROMPT.substitute(language_name=LANGUAGE_NAMES[request.language])
     prompt = ANSWER_PROMPT.substitute(
-        question=defang(request.question.prompt[:PROMPT_FIELD_CHARS]),
-        reference=defang(request.question.reference_answer[:PROMPT_FIELD_CHARS]),
-        quote=defang(request.question.source_quote[:PROMPT_FIELD_CHARS]),
+        question=defang(request.question.prompt),
+        reference=defang(request.question.reference_answer),
+        quote=defang(request.question.source_quote),
         answer=defang(request.answer),
     )
     try:
