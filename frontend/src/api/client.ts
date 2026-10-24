@@ -24,6 +24,10 @@ export class StreamParseError extends Error {
   override name = 'StreamParseError'
 }
 
+export class StreamTimeoutError extends Error {
+  override name = 'StreamTimeoutError'
+}
+
 export async function* readNdjson(stream: ReadableStream<Uint8Array>): AsyncGenerator<unknown, void> {
   const reader = stream.getReader()
   const decoder = new TextDecoder()
@@ -80,17 +84,51 @@ function checkOrder(plan: PlanEvent | null, event: StreamEvent): void {
   }
 }
 
-export async function* streamEpisodes(request: EpisodesRequest, signal: AbortSignal): AsyncGenerator<StreamEvent> {
-  const body = USE_FIXTURES ? await fixtureEpisodeStream(signal) : await postForStream('/api/episodes/stream', request, signal)
-  let plan: PlanEvent | null = null
-  for await (const value of readNdjson(body)) {
-    if (!isStreamEvent(value)) throw new ContractError('Episode stream sent an event that does not match the contract')
-    checkOrder(plan, value)
-    if (value.type === 'plan') plan = value
-    yield value
-    if (value.type === 'done' || value.type === 'error') return
+// Above the backend's 30 s LLM timeout, below Vercel's 60 s function limit.
+export const STREAM_IDLE_MS = 45_000
+
+export async function* streamEpisodes(
+  request: EpisodesRequest,
+  signal: AbortSignal,
+  idleMs = STREAM_IDLE_MS,
+): AsyncGenerator<StreamEvent> {
+  const controller = new AbortController()
+  const forwardAbort = () => {
+    controller.abort()
   }
-  throw new ContractError('Episode stream ended without a done or error event')
+  if (signal.aborted) controller.abort()
+  else signal.addEventListener('abort', forwardAbort, { once: true })
+  const idleTimeout = new StreamTimeoutError(`No stream event for ${String(idleMs)} ms`)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const restartIdleTimer = () => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      controller.abort(idleTimeout)
+    }, idleMs)
+  }
+
+  try {
+    restartIdleTimer()
+    const body = USE_FIXTURES
+      ? await fixtureEpisodeStream(controller.signal)
+      : await postForStream('/api/episodes/stream', request, controller.signal)
+    let plan: PlanEvent | null = null
+    for await (const value of readNdjson(body)) {
+      restartIdleTimer()
+      if (!isStreamEvent(value)) throw new ContractError('Episode stream sent an event that does not match the contract')
+      checkOrder(plan, value)
+      if (value.type === 'plan') plan = value
+      yield value
+      if (value.type === 'done' || value.type === 'error') return
+    }
+    throw new ContractError('Episode stream ended without a done or error event')
+  } catch (error) {
+    if (controller.signal.reason === idleTimeout) throw idleTimeout
+    throw error
+  } finally {
+    clearTimeout(timer)
+    signal.removeEventListener('abort', forwardAbort)
+  }
 }
 
 async function postForStream(path: string, payload: unknown, signal: AbortSignal): Promise<ReadableStream<Uint8Array>> {

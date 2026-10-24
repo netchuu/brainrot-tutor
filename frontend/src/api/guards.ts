@@ -1,6 +1,17 @@
-import { ERROR_CODES, LANGUAGES, REACTIONS, SFX, SPEAKERS, TEMPLATE_IDS, VERDICTS } from '@/types/contract'
+import {
+  BACKGROUND_IDS,
+  CHARACTER_IDS,
+  ERROR_CODES,
+  LANGUAGES,
+  REACTIONS,
+  SFX,
+  SPEAKERS,
+  TEMPLATE_IDS,
+  VERDICTS,
+} from '@/types/contract'
 import type {
   Audio,
+  Cast,
   EpisodeOutline,
   ErrorResponse,
   Picture,
@@ -75,13 +86,19 @@ function isScene(value: unknown): value is Scene {
   )
 }
 
+function isCast(value: unknown): value is Cast {
+  return isObject(value) && isOneOf(CHARACTER_IDS, value.teacher) && isOneOf(CHARACTER_IDS, value.student)
+}
+
 function isEpisodeOutline(value: unknown): value is EpisodeOutline {
   return (
     isObject(value) &&
     isNonNegativeInteger(value.index) &&
     isString(value.title) &&
     isOneOf(TEMPLATE_IDS, value.template) &&
-    isNonNegativeInteger(value.scene_count)
+    isNonNegativeInteger(value.scene_count) &&
+    isCast(value.cast) &&
+    isOneOf(BACKGROUND_IDS, value.background)
   )
 }
 

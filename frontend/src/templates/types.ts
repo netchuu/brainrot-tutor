@@ -10,6 +10,5 @@ export interface TemplateProps {
 
 export interface TemplateDefinition {
   component: ComponentType<TemplateProps>
-  background: (episodeIndex: number) => string
-  assets: readonly string[]
+  preload: (episode: EpisodeOutline) => string[]
 }

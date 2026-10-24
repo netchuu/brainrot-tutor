@@ -42,6 +42,27 @@ describe('isStreamEvent', () => {
     expect(isStreamEvent(sceneEventWith(patch))).toBe(false)
   })
 
+  it.each([
+    ['without a cast', { cast: undefined }],
+    ['with an unknown character', { cast: { teacher: 'wizard', student: 'kid' } }],
+    ['with a missing student', { cast: { teacher: 'professor' } }],
+    ['with an unknown background', { background: 'lava' }],
+    ['without a background', { background: undefined }],
+  ])('rejects a plan episode %s', (_, patch) => {
+    const episode = {
+      index: 0,
+      title: 'x',
+      template: 'parkour_duo',
+      scene_count: 3,
+      cast: { teacher: 'robot', student: 'cat' },
+      background: 'surf',
+    }
+    expect(isStreamEvent({ type: 'plan', course_title: 'x', language: 'ru', episodes: [episode] })).toBe(true)
+    expect(
+      isStreamEvent({ type: 'plan', course_title: 'x', language: 'ru', episodes: [{ ...episode, ...patch }] }),
+    ).toBe(false)
+  })
+
   it('rejects an unknown event type and a plan with an unknown template', () => {
     expect(isStreamEvent({ type: 'progress', percent: 50 })).toBe(false)
     expect(

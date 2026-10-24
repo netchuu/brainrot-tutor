@@ -8,7 +8,16 @@ const PLAN_LINE = JSON.stringify({
   type: 'plan',
   course_title: 'Course',
   language: 'ru',
-  episodes: [{ index: 0, title: 'Episode', template: 'parkour_duo', scene_count: 1 }],
+  episodes: [
+    {
+      index: 0,
+      title: 'Episode',
+      template: 'parkour_duo',
+      scene_count: 1,
+      cast: { teacher: 'professor', student: 'kid' },
+      background: 'parkour',
+    },
+  ],
 })
 const DONE_LINE = '{"type":"done","elapsed_ms":5}'
 
@@ -102,6 +111,7 @@ describe('streamEpisodes', () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.unstubAllEnvs()
   })
@@ -172,6 +182,38 @@ describe('streamEpisodes', () => {
     respondWith(new Response(`${PLAN_LINE}\n{"type":"episode_done","episode":0}\n`))
     const { client, run } = await load()
     await expect(run()).rejects.toBeInstanceOf(client.ContractError)
+  })
+
+  it('fails with StreamTimeoutError when no event arrives within the idle limit', async () => {
+    vi.useFakeTimers()
+    let lastEventAt = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_: string, init?: RequestInit) =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                setTimeout(() => {
+                  lastEventAt = Date.now()
+                  controller.enqueue(encoder.encode(`${PLAN_LINE}\n`))
+                }, 900)
+                init?.signal?.addEventListener('abort', () => {
+                  controller.error(new DOMException('aborted', 'AbortError'))
+                })
+              },
+            }),
+          ),
+        ),
+      ),
+    )
+    const { client } = await load()
+    const startedAt = Date.now()
+    const failure = collect(client.streamEpisodes(request, new AbortController().signal, 1000))
+    const assertion = expect(failure).rejects.toBeInstanceOf(client.StreamTimeoutError)
+    await vi.advanceTimersByTimeAsync(2000)
+    await assertion
+    expect(lastEventAt - startedAt).toBe(900)
   })
 
   it('throws ContractError on events before the plan or outside it', async () => {

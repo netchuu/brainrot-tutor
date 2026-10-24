@@ -7,6 +7,12 @@ export type TemplateId = (typeof TEMPLATE_IDS)[number]
 export const SPEAKERS = ['teacher', 'student'] as const
 export type Speaker = (typeof SPEAKERS)[number]
 
+export const CHARACTER_IDS = ['professor', 'mechanic', 'robot', 'kid', 'gamer', 'cat'] as const
+export type CharacterId = (typeof CHARACTER_IDS)[number]
+
+export const BACKGROUND_IDS = ['parkour', 'surf', 'runner', 'satisfying'] as const
+export type BackgroundId = (typeof BACKGROUND_IDS)[number]
+
 export const REACTIONS = ['none', 'mind_blown', 'shocked', 'laugh', 'thinking', 'fire', 'check', 'cross'] as const
 export type Reaction = (typeof REACTIONS)[number]
 
@@ -55,11 +61,18 @@ export interface Scene {
   source_quote: string | null
 }
 
+export interface Cast {
+  teacher: CharacterId
+  student: CharacterId
+}
+
 export interface EpisodeOutline {
   index: number
   title: string
   template: TemplateId
   scene_count: number
+  cast: Cast
+  background: BackgroundId
 }
 
 export interface PlanEvent {

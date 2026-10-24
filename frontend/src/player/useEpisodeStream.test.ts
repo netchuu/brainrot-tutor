@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, ContractError } from '@/api/client'
+import { ApiError, ContractError, StreamParseError, StreamTimeoutError } from '@/api/client'
 import { initialStreamState, streamReducer, toFailure, useEpisodeStream } from '@/player/useEpisodeStream'
+import { ru } from '@/strings'
 import { FIXTURE_TEXT, fixtureEvents } from '@/test/fixtureEvents'
 import type { EpisodesRequest } from '@/types/contract'
 
@@ -36,7 +37,7 @@ describe('streamReducer', () => {
       event: { type: 'error', code: 'llm_unavailable', message: 'Both providers failed', retryable: true },
     })
     expect(state.status).toBe('failed')
-    expect(state.error).toEqual({ code: 'llm_unavailable', message: 'Both providers failed', retryable: true })
+    expect(state.error).toEqual({ kind: 'llm_unavailable', message: ru.errors.llm_unavailable, retryable: true })
   })
 
   it('resets everything when a new stream starts', () => {
@@ -49,14 +50,16 @@ describe('streamReducer', () => {
 })
 
 describe('toFailure', () => {
-  it('keeps the contract error code and hides raw messages of other errors', () => {
-    expect(toFailure(new ApiError('too_long', 'Text is too long', false))).toEqual({
-      code: 'too_long',
-      message: 'Text is too long',
-      retryable: false,
-    })
-    expect(toFailure(new ContractError('internal detail'))).toMatchObject({ code: 'internal', retryable: true })
-    expect(toFailure(new TypeError('Load failed')).message).not.toContain('Load failed')
+  it.each([
+    [new ApiError('too_long', 'Text is too long', false), 'too_long', false],
+    [new ApiError('rate_limited', 'slow down', true), 'rate_limited', true],
+    [new StreamTimeoutError('silent'), 'timeout', true],
+    [new ContractError('internal detail'), 'broken', true],
+    [new StreamParseError('bad line'), 'broken', true],
+    [new TypeError('Load failed'), 'network', true],
+    [new RangeError('odd'), 'unknown', true],
+  ] as const)('maps %s to a Russian %s message', (error, kind, retryable) => {
+    expect(toFailure(error)).toEqual({ kind, message: ru.errors[kind], retryable })
   })
 })
 
@@ -79,14 +82,20 @@ describe('useEpisodeStream', () => {
     )
   })
 
-  it('awaits a request promise and reports its failure', async () => {
+  it('reports an ErrorResponse with its Russian message and stop resets the state', async () => {
+    const body = JSON.stringify({ error: { code: 'bad_input', message: 'source_text: too short', retryable: false } })
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(body, { status: 422 }))))
     const { result } = renderHook(() => useEpisodeStream())
     act(() => {
-      result.current.start(Promise.reject(new ApiError('bad_input', 'Empty text', false)))
+      result.current.start(request)
     })
     await waitFor(() => {
-      expect(result.current.state.error).toEqual({ code: 'bad_input', message: 'Empty text', retryable: false })
+      expect(result.current.state.error).toEqual({ kind: 'bad_input', message: ru.errors.bad_input, retryable: false })
     })
+    act(() => {
+      result.current.stop()
+    })
+    expect(result.current.state).toEqual(initialStreamState)
   })
 
   it('fails as retryable when the stream ends without a terminal event', async () => {

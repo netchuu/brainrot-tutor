@@ -78,7 +78,7 @@ Gates and times come from `docs/PLAN.md`. Tick boxes here as you finish them.
 - [x] `Stage` + `ParkourDuo` play episode 0 of the fixture: background loop, picture slot, captions with highlight, mascots swapping by `speaker`, reaction sticker, sfx
 
 ### M2 End to end (Day 1, 18:00) — the key gate
-- [ ] Upload screen: paste text or pick a PDF → stream from the backend → playback starts on the first `scene`; loading, error and retry states
+- [x] Upload screen: paste text or pick a PDF → stream from the backend → playback starts on the first `scene`; loading, error and retry states
 - [ ] Deployed on Vercel; works on a phone against the deployed backend
 
 ### M3 Learning loop (Day 1 evening)

@@ -1,6 +1,16 @@
 import schemaText from '../../../contracts/schemas/contract.schema.json?raw'
 import { describe, expect, it } from 'vitest'
-import { ERROR_CODES, LANGUAGES, REACTIONS, SFX, SPEAKERS, TEMPLATE_IDS, VERDICTS } from '@/types/contract'
+import {
+  BACKGROUND_IDS,
+  CHARACTER_IDS,
+  ERROR_CODES,
+  LANGUAGES,
+  REACTIONS,
+  SFX,
+  SPEAKERS,
+  TEMPLATE_IDS,
+  VERDICTS,
+} from '@/types/contract'
 
 const schema: unknown = JSON.parse(schemaText)
 
@@ -18,6 +28,8 @@ describe('contract enums', () => {
     ['Language', LANGUAGES],
     ['TemplateId', TEMPLATE_IDS],
     ['Speaker', SPEAKERS],
+    ['CharacterId', CHARACTER_IDS],
+    ['BackgroundId', BACKGROUND_IDS],
     ['Reaction', REACTIONS],
     ['Sfx', SFX],
     ['ErrorCode', ERROR_CODES],

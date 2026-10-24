@@ -1,24 +1,28 @@
 import { describe, expect, it } from 'vitest'
 import { cursorReducer, playbackStatus, reactionAtMs, sceneDurationMs, SILENT_TAIL_MS } from '@/player/usePlayback'
-import { fixtureScene } from '@/test/fixtureEvents'
+import { fixtureScene, wordStart } from '@/test/fixtureEvents'
+
+const scene = fixtureScene('e0s0')
+const lastWordEnd = scene.words.at(-1)?.end_ms ?? 0
 
 describe('sceneDurationMs', () => {
   it('uses the audio duration when voice exists', () => {
-    expect(sceneDurationMs(fixtureScene('e0s0'))).toBe(6000)
+    expect(sceneDurationMs(scene)).toBe(scene.audio?.duration_ms)
   })
 
   it('runs from word timings plus a tail when voice failed', () => {
-    expect(sceneDurationMs({ ...fixtureScene('e0s0'), audio: null })).toBe(5075 + SILENT_TAIL_MS)
+    expect(sceneDurationMs({ ...scene, audio: null })).toBe(lastWordEnd + SILENT_TAIL_MS)
   })
 })
 
 describe('reactionAtMs', () => {
   it('pops the reaction when the highlight word starts', () => {
-    expect(reactionAtMs(fixtureScene('e0s2'))).toBe(525)
+    const sensors = fixtureScene('e0s2')
+    expect(reactionAtMs(sensors)).toBe(wordStart(sensors, 'миллисекунду'))
   })
 
   it('falls back to 40 % of the scene without a highlight', () => {
-    expect(reactionAtMs({ ...fixtureScene('e0s0'), highlight: null })).toBe(2400)
+    expect(reactionAtMs({ ...scene, highlight: null })).toBe(Math.round(sceneDurationMs(scene) * 0.4))
   })
 })
 

@@ -1,12 +1,11 @@
-import { allMascotSrcs, backgroundSrc } from '@/assets'
+import { castMascotSrcs } from '@/assets'
 import { ParkourDuo } from '@/templates/ParkourDuo/ParkourDuo'
 import type { TemplateDefinition } from '@/templates/types'
 import type { TemplateId } from '@/types/contract'
 
 const parkourDuo: TemplateDefinition = {
   component: ParkourDuo,
-  background: (episodeIndex) => backgroundSrc('parkour', episodeIndex),
-  assets: allMascotSrcs(),
+  preload: (episode) => castMascotSrcs(episode.cast),
 }
 
 const TEMPLATES: Partial<Record<TemplateId, TemplateDefinition>> = {

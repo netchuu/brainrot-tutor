@@ -1,5 +1,3 @@
-import type { EpisodesRequest } from '@/types/contract'
-
 export const USE_FIXTURES = import.meta.env.VITE_USE_FIXTURES === '1'
 
 const EVENT_GAP_MS = 300
@@ -15,10 +13,10 @@ export async function fixtureEpisodeStream(signal: AbortSignal): Promise<Readabl
   return replayLines(text, signal, EVENT_GAP_MS)
 }
 
-export async function fixtureEpisodesRequest(): Promise<EpisodesRequest> {
+export async function fixtureSourceText(): Promise<string> {
   if (!USE_FIXTURES) throw new FixtureModeError('Fixture mode is off')
   const { default: sourceText } = await import('../../../contracts/fixtures/source.txt?raw')
-  return { source_text: sourceText, language: 'ru', episode_count: 3, template: null }
+  return sourceText
 }
 
 export function replayLines(text: string, signal: AbortSignal, gapMs: number): ReadableStream<Uint8Array> {

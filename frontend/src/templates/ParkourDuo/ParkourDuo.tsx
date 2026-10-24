@@ -1,11 +1,11 @@
-import { MASCOT_EMOJI, mascotSrc, REACTION_EMOJI, stickerSrc } from '@/assets'
+import { CHARACTER_EMOJI, mascotSrc, REACTION_EMOJI, stickerSrc } from '@/assets'
 import type { StickerReaction } from '@/assets'
 import { Caption } from '@/player/Caption'
 import { FallbackImage } from '@/player/FallbackImage'
 import { reactionAtMs } from '@/player/usePlayback'
 import { mascotPose } from '@/templates/ParkourDuo/pose'
 import type { TemplateProps } from '@/templates/types'
-import type { Scene, Speaker } from '@/types/contract'
+import type { CharacterId, Scene, Speaker } from '@/types/contract'
 
 function HighlightCard({ scene }: { scene: Scene }) {
   const text = scene.highlight ?? scene.term
@@ -62,24 +62,24 @@ const MASCOT_COLOR: Record<Speaker, string> = {
   student: 'bg-pink-500',
 }
 
-function Mascot({ character, scene }: { character: Speaker; scene: Scene }) {
-  const active = scene.speaker === character
+function Mascot({ role, character, scene }: { role: Speaker; character: CharacterId; scene: Scene }) {
+  const active = scene.speaker === role
   const fallback = (
     <div
-      className={`flex aspect-square w-[34cqw] items-center justify-center rounded-full border-[1cqw] border-white text-[18cqw] leading-none shadow-2xl ${MASCOT_COLOR[character]}`}
+      className={`flex aspect-square w-[34cqw] items-center justify-center rounded-full border-[1cqw] border-white text-[18cqw] leading-none shadow-2xl ${MASCOT_COLOR[role]}`}
     >
-      {MASCOT_EMOJI[character]}
+      {CHARACTER_EMOJI[character]}
     </div>
   )
   return (
     <div
-      data-testid={`mascot-${character}`}
+      data-testid={`mascot-${role}`}
       data-active={active}
-      className={`absolute bottom-0 flex h-[30cqh] w-[46cqw] origin-bottom items-end justify-center transition-all duration-300 ${MASCOT_SIDE[character]} ${active ? 'z-10 scale-100 opacity-100' : 'scale-[0.7] opacity-50 grayscale'}`}
+      className={`absolute bottom-0 flex h-[30cqh] w-[46cqw] origin-bottom items-end justify-center transition-all duration-300 ${MASCOT_SIDE[role]} ${active ? 'z-10 scale-100 opacity-100' : 'scale-[0.7] opacity-50 grayscale'}`}
     >
       <div className={`flex h-full w-full items-end justify-center ${active ? 'animate-bob' : ''}`}>
         <FallbackImage
-          src={mascotSrc(character, mascotPose(scene, character))}
+          src={mascotSrc(character, mascotPose(scene, role))}
           alt={character}
           className="h-full w-full object-contain object-bottom"
           fallback={fallback}
@@ -89,7 +89,7 @@ function Mascot({ character, scene }: { character: Speaker; scene: Scene }) {
   )
 }
 
-export function ParkourDuo({ scene, timeMs }: TemplateProps) {
+export function ParkourDuo({ episode, scene, timeMs }: TemplateProps) {
   const reaction = scene.reaction === 'none' ? null : scene.reaction
   return (
     <div className="absolute inset-0">
@@ -98,8 +98,8 @@ export function ParkourDuo({ scene, timeMs }: TemplateProps) {
       <div className="absolute inset-x-[4cqw] top-[54cqh] flex min-h-[14cqh] items-center justify-center">
         <Caption words={scene.words} highlight={scene.highlight} timeMs={timeMs} />
       </div>
-      <Mascot character="teacher" scene={scene} />
-      <Mascot character="student" scene={scene} />
+      <Mascot role="teacher" character={episode.cast.teacher} scene={scene} />
+      <Mascot role="student" character={episode.cast.student} scene={scene} />
     </div>
   )
 }

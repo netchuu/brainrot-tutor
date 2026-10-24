@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react'
-import { ApiError, ContractError, StreamParseError, streamEpisodes } from '@/api/client'
-import type { EpisodesRequest, ErrorCode, PlanEvent, Scene, StreamEvent } from '@/types/contract'
+import { ApiError, ContractError, StreamParseError, StreamTimeoutError, streamEpisodes } from '@/api/client'
+import { ru } from '@/strings'
+import type { FailureKind } from '@/strings'
+import type { EpisodesRequest, PlanEvent, Scene, StreamEvent } from '@/types/contract'
 
 export interface StreamFailure {
-  code: ErrorCode
+  kind: FailureKind
   message: string
   retryable: boolean
+}
+
+function failure(kind: FailureKind, retryable: boolean): StreamFailure {
+  return { kind, message: ru.errors[kind], retryable }
 }
 
 export interface StreamState {
@@ -19,6 +25,7 @@ export interface StreamState {
 
 export type StreamAction =
   | { type: 'started' }
+  | { type: 'stopped' }
   | { type: 'event'; event: StreamEvent }
   | { type: 'failed'; error: StreamFailure }
 
@@ -54,11 +61,7 @@ function applyEvent(state: StreamState, event: StreamEvent): StreamState {
     case 'done':
       return { ...state, status: 'done', elapsedMs: event.elapsed_ms }
     case 'error':
-      return {
-        ...state,
-        status: 'failed',
-        error: { code: event.code, message: event.message, retryable: event.retryable },
-      }
+      return { ...state, status: 'failed', error: failure(event.code, event.retryable) }
   }
 }
 
@@ -66,6 +69,8 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
   switch (action.type) {
     case 'started':
       return { ...initialStreamState, status: 'streaming' }
+    case 'stopped':
+      return initialStreamState
     case 'event':
       return applyEvent(state, action.event)
     case 'failed':
@@ -74,29 +79,24 @@ export function streamReducer(state: StreamState, action: StreamAction): StreamS
 }
 
 export function toFailure(error: unknown): StreamFailure {
-  if (error instanceof ApiError) return { code: error.code, message: error.message, retryable: error.retryable }
-  if (error instanceof ContractError || error instanceof StreamParseError) {
-    return { code: 'internal', message: 'The lesson stream broke off. Try again.', retryable: true }
-  }
-  if (error instanceof TypeError) {
-    return { code: 'internal', message: 'Network problem. Check the connection and try again.', retryable: true }
-  }
-  return { code: 'internal', message: 'Something went wrong while making the lesson.', retryable: true }
+  if (error instanceof ApiError) return failure(error.code, error.retryable)
+  if (error instanceof StreamTimeoutError) return failure('timeout', true)
+  if (error instanceof ContractError || error instanceof StreamParseError) return failure('broken', true)
+  if (error instanceof TypeError) return failure('network', true)
+  return failure('unknown', true)
 }
 
-async function consume(
-  request: EpisodesRequest | Promise<EpisodesRequest>,
-  signal: AbortSignal,
-  dispatch: (action: StreamAction) => void,
-) {
+async function consume(request: EpisodesRequest, signal: AbortSignal, dispatch: (action: StreamAction) => void) {
   try {
-    for await (const event of streamEpisodes(await request, signal)) {
+    for await (const event of streamEpisodes(request, signal)) {
       if (signal.aborted) return
       dispatch({ type: 'event', event })
     }
   } catch (error) {
     if (signal.aborted) return
-    dispatch({ type: 'failed', error: toFailure(error) })
+    const failure = toFailure(error)
+    dispatch({ type: 'failed', error: failure })
+    if (failure.kind === 'unknown') throw error
   }
 }
 
@@ -106,7 +106,7 @@ export function useEpisodeStream() {
 
   useEffect(() => () => controllerRef.current?.abort(), [])
 
-  const start = useCallback((request: EpisodesRequest | Promise<EpisodesRequest>) => {
+  const start = useCallback((request: EpisodesRequest) => {
     controllerRef.current?.abort()
     const controller = new AbortController()
     controllerRef.current = controller
@@ -114,5 +114,11 @@ export function useEpisodeStream() {
     void consume(request, controller.signal, dispatch)
   }, [])
 
-  return { state, start }
+  const stop = useCallback(() => {
+    controllerRef.current?.abort()
+    controllerRef.current = null
+    dispatch({ type: 'stopped' })
+  }, [])
+
+  return { state, start, stop }
 }
