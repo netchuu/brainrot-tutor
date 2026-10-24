@@ -13,6 +13,7 @@ from app.config import PROMPTS_DIR
 from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import OpenQuestion, QuizRequest, QuizResponse, QuizSceneRef, SingleChoiceQuestion
 from app.schemas.quiz import DraftQuestion, QuestionFixes, QuizDraft
+from app.services.cache import LruCache, cache_key
 from app.services.grounding import GroundedSource, defang, normalize
 from app.services.script_writer import LANGUAGE_NAMES
 
@@ -40,6 +41,7 @@ POSITIONAL_OPTION = re.compile(
 POSITIONAL_EXPLANATION = re.compile(r"\b(option|answer|вариант|ответ)\s+[abcdабвг1-4]\b", re.IGNORECASE)
 
 AnyQuestion = SingleChoiceQuestion | OpenQuestion
+QUIZ_CACHE: LruCache[QuizResponse] = LruCache(128)
 
 
 @dataclass(frozen=True)
@@ -201,8 +203,14 @@ async def write_quiz(request: QuizRequest) -> QuizResponse:
 
 
 async def make_quiz(request: QuizRequest) -> QuizResponse:
+    key = cache_key("quiz", request.model_dump(mode="json"))
+    cached = QUIZ_CACHE.get(key)
+    if cached is not None:
+        return cached
     try:
         async with asyncio.timeout(QUIZ_DEADLINE_S):
-            return await write_quiz(request)
+            quiz = await write_quiz(request)
     except TimeoutError:
         raise LlmUnavailableError("Writing the quiz took too long. Try again.") from None
+    QUIZ_CACHE.put(key, quiz)
+    return quiz

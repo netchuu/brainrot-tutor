@@ -36,9 +36,9 @@ backend/
     api/        health.py  episodes.py  quiz.py  tutor.py
     schemas/    contract.py          Pydantic models, same names and fields as contracts/schemas
                 script.py  quiz.py   LLM output models (validated, then grounded)
-    services/   script_writer.py  narrator.py  pictures.py  pipeline.py  quiz_maker.py  grader.py  tutor.py  grounding.py  cast.py  fixture_replay.py
+    services/   script_writer.py  narrator.py  pictures.py  pipeline.py  quiz_maker.py  grader.py  tutor.py  grounding.py  cast.py  fixture_replay.py  cache.py
     clients/    llm.py (Gemini, Groq fallback)  tts.py (edge-tts)  pexels.py
-    prompts/    script.md  script_episode.md  script_repair.md  quiz.md  quiz_episode.md  quiz_repair.md  grade.md  grade_answer.md  tutor.md
+    prompts/    script.md  script_episode.md  script_repair.md  quiz.md  quiz_episode.md  quiz_repair.md  grade.md  grade_answer.md  tutor.md  tutor_question.md
   tests/
 ```
 

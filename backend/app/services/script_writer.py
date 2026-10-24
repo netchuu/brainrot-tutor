@@ -11,6 +11,7 @@ from app.config import PROMPTS_DIR
 from app.errors import LlmUnavailableError, RateLimitedError
 from app.schemas.contract import Language, TemplateId
 from app.schemas.script import AiTemplate, CourseScript, EpisodeDraft, EpisodeScript, SceneFixes, ScriptScene
+from app.services.cache import LruCache, cache_key
 from app.services.grounding import SENTENCE_BREAK, GroundedSource, check_scene, defang, normalize
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ CHOOSE_TEMPLATE = (
     "Only these three may be chosen."
 )
 MAX_TERM_CHARS = 80
+SCRIPT_CACHE: LruCache[CourseScript] = LruCache(32)
 MAX_FORMULA_CHARS = 200
 PARAGRAPH_BREAK = re.compile(r"\n\s*\n")
 
@@ -174,6 +176,14 @@ async def write_script(
     template: TemplateId | None,
     on_ready: EpisodeReady | None = None,
 ) -> CourseScript:
+    key = cache_key("script", source_text, language, episode_count, template)
+    cached = SCRIPT_CACHE.get(key)
+    if cached is not None:
+        logger.info("script served from cache")
+        for episode in cached.episodes:
+            if on_ready is not None:
+                on_ready(episode.number, episode.scenes)
+        return cached
     fragments = split_source(source_text, episode_count)
     system = SYSTEM_PROMPT.substitute(
         language_name=LANGUAGE_NAMES[language],
@@ -192,10 +202,14 @@ async def write_script(
         for number, result in enumerate(results)
         if isinstance(result, EpisodeDraft)
     ]
+    failures = [result for result in results if isinstance(result, RateLimitedError | LlmUnavailableError)]
     if not episodes:
-        failures = [result for result in results if isinstance(result, RateLimitedError | LlmUnavailableError)]
         if failures:
             raise failures[0]
         raise LlmUnavailableError("The AI could not write a lesson grounded in this text. Try again.")
     course_title = next(result.course_title for result in results if isinstance(result, EpisodeDraft))
-    return CourseScript(course_title=course_title, language=language, episodes=episodes)
+    script = CourseScript(course_title=course_title, language=language, episodes=episodes)
+    # A course missing an episode because a provider failed is not kept; the next request may get all three.
+    if not failures:
+        SCRIPT_CACHE.put(key, script)
+    return script

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from app.clients.tts import Boundary, synthesize
 from app.errors import VoiceError
 from app.schemas.contract import Audio, CharacterId, Language, Word
+from app.services.cache import LruCache, cache_key
 from app.services.cast import voice_for
 from app.services.grounding import SPOKEN_WORD
 
@@ -18,6 +19,8 @@ MP3_BYTES_PER_MS = 48_000 / 8 / 1000
 LEAD_IN_MS = 100
 ESTIMATED_CHARS_PER_S = 14
 MIN_WORD_MS = 120
+# About 50 KB of base64 MP3 per line, so 300 lines stay near 15 MB.
+VOICE_CACHE: LruCache["Narration"] = LruCache(300)
 
 
 @dataclass(frozen=True)
@@ -59,6 +62,17 @@ def estimate_words(text: str, duration_ms: int | None) -> list[Word]:
 
 
 async def narrate(text: str, character: CharacterId, language: Language) -> Narration:
+    key = cache_key("voice", text, character, language)
+    cached = VOICE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    narration = await speak(text, character, language)
+    if not narration.words_estimated:
+        VOICE_CACHE.put(key, narration)
+    return narration
+
+
+async def speak(text: str, character: CharacterId, language: Language) -> Narration:
     voice, pitch, rate = voice_for(character, language)
     try:
         async with asyncio.timeout(VOICE_SCENE_TIMEOUT_S):

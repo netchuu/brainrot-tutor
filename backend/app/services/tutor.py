@@ -11,6 +11,7 @@ from app.config import PROMPTS_DIR
 from app.errors import AppError, LlmUnavailableError
 from app.schemas.contract import ChatMessage, ErrorEvent, TutorDeltaEvent, TutorDoneEvent, TutorRequest
 from app.schemas.quiz import TutorDraft
+from app.services.cache import LruCache, cache_key
 from app.services.grounding import SPOKEN_WORD, GroundedSource, defang
 from app.services.pipeline import elapsed_ms, ndjson
 from app.services.script_writer import LANGUAGE_NAMES
@@ -33,6 +34,7 @@ QUOTE_RETRY_NOTE = (
     "Copy 1 to 3 complete sentences character for character, or return an empty list."
 )
 WORD_WITH_SPACE = re.compile(r"\S+\s*")
+TUTOR_CACHE: LruCache["TutorAnswer"] = LruCache(128)
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,16 @@ def grounded_quotes(source: GroundedSource, quotes: list[str]) -> list[str]:
 
 
 async def answer_question(request: TutorRequest) -> TutorAnswer:
+    key = cache_key("tutor", request.model_dump(mode="json"))
+    cached = TUTOR_CACHE.get(key)
+    if cached is not None:
+        return cached
+    answer = await ask_model(request)
+    TUTOR_CACHE.put(key, answer)
+    return answer
+
+
+async def ask_model(request: TutorRequest) -> TutorAnswer:
     source = GroundedSource(request.source_text)
     question = " ".join(message.content for message in request.messages[-3:] if message.role == "user")
     system = SYSTEM_PROMPT.substitute(language_name=LANGUAGE_NAMES[request.language])

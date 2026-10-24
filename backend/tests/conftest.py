@@ -7,6 +7,7 @@ import pytest
 from app.config import CONTRACTS_DIR, Settings, get_settings
 from app.main import create_app
 from app.schemas.script import EpisodeDraft, ScriptScene
+from app.services.cache import clear_all
 
 FIXTURES_DIR = CONTRACTS_DIR / "fixtures"
 SOURCE_TEXT = (FIXTURES_DIR / "source.txt").read_text(encoding="utf-8")
@@ -31,6 +32,7 @@ def isolated_settings(request: pytest.FixtureRequest, monkeypatch: pytest.Monkey
             monkeypatch.delenv(name, raising=False)
         monkeypatch.setenv("ALLOWED_ORIGINS", TEST_ORIGINS)
     get_settings.cache_clear()
+    clear_all()
     yield
     get_settings.cache_clear()
 
