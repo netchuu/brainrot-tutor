@@ -30,9 +30,10 @@ You own `frontend/` except `frontend/public/assets/`, which the content lead fil
 ```
 frontend/src/
   api/         client.ts (fetch, NDJSON streams, JSON calls, errors)  guards.ts  failure.ts (Russian error copy by kind)  fixtures.ts (VITE_USE_FIXTURES)
-  player/      Stage.tsx (9:16 frame, layers)  usePlayback.ts (scene clock)  captions.ts (2–3 word chunks)  sfx.ts  useEpisodeStream.ts  useSwipe.ts
-  templates/   registry.ts  types.ts  shared.tsx  pose.ts  ParkourDuo/  SplitScreen/  FakeChat/  Top3Countdown/  MythOrFact/
-  quiz/        session.ts (answers, score)  useQuizzes.ts (prefetch per episode)  QuestionCard.tsx
+  player/      Stage.tsx (9:16 frame, layers)  usePlayback.ts (scene clock)  audioOutput.ts (unlocked <audio> + AudioContext)  sfx.ts
+               captions.ts (2–3 word chunks)  Caption.tsx  FallbackImage.tsx  useEpisodeStream.ts  useSwipe.ts
+  templates/   registry.ts  types.ts  shared.tsx  pose.ts  ParkourDuo/  SplitScreen/ (Formula, KaTeX)  FakeChat/ (reveal.ts)  Top3Countdown/  MythOrFact/ (claim.ts)
+  quiz/        session.ts (answers, score)  useQuizzes.ts (prefetch per episode)  QuestionCard.tsx  styles.ts
   tutor/       useTutor.ts (chat state, streaming)
   screens/     Upload.tsx  Feed.tsx  Quiz.tsx  Tutor.tsx
   pdf/         extractText.ts (pdfjs-dist legacy build)
@@ -41,7 +42,7 @@ frontend/src/
   strings.ts   all Russian UI copy
   assets.ts    names of files in public/assets, matching contracts/api.md (CharacterId, BackgroundId, Reaction, Sfx)
 ```
-- A template is a component that receives the current scene, the playback time and the episode; it never hardcodes lesson text. `registry.ts` maps `TemplateId` to the component.
+- A template is a component that receives the episode, the current scene, its index, the playback time and the earlier scenes of the episode (`history`); it never hardcodes lesson text. `registry.ts` maps every `TemplateId` to its component, preload list, optional `prepare` and background area.
 
 ### Player
 - One clock per scene: its `<audio>` element. Captions, speaker swaps, reactions and highlights derive from `audio.currentTime` read in `requestAnimationFrame`; no `setTimeout` chains

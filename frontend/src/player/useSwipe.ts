@@ -15,9 +15,11 @@ export function useSwipe(onSwipe: ((direction: SwipeDirection) => void) | undefi
   const start = useRef<{ x: number; y: number; time: number } | null>(null)
   return {
     onPointerDown: (event: PointerEvent) => {
+      if (!event.isPrimary) return
       start.current = { x: event.clientX, y: event.clientY, time: event.timeStamp }
     },
     onPointerUp: (event: PointerEvent) => {
+      if (!event.isPrimary) return
       const from = start.current
       start.current = null
       if (from === null || onSwipe === undefined) return

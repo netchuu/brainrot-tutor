@@ -5,7 +5,7 @@ import type { Failure } from '@/api/failure'
 import type { ChatMessage, Language } from '@/types/contract'
 
 const MAX_MESSAGES = 20
-const MAX_MESSAGE_CHARS = 2000
+export const MAX_MESSAGE_CHARS = 2000
 
 export interface TutorTurn {
   role: ChatMessage['role']

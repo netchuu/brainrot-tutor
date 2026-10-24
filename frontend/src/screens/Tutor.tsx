@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { ru } from '@/strings'
+import { MAX_MESSAGE_CHARS } from '@/tutor/useTutor'
 import type { TutorState, TutorTurn } from '@/tutor/useTutor'
 
-const MAX_QUESTION_CHARS = 2000
 
 function Sources({ quotes }: { quotes: string[] }) {
   if (quotes.length === 0) return null
@@ -97,9 +97,11 @@ export function Tutor({ state, onAsk, onRetry, onClose }: TutorProps) {
             ))}
           </div>
         )}
-        {state.turns.map((turn, index) => (
-          <Bubble key={index} turn={turn} typing={streaming && index === state.turns.length - 1} />
-        ))}
+        {state.turns.map((turn, index) => {
+          const last = index === state.turns.length - 1
+          if (turn.role === 'assistant' && !turn.complete && turn.content === '' && !(streaming && last)) return null
+          return <Bubble key={index} turn={turn} typing={streaming && last} />
+        })}
         {state.status === 'failed' && state.failure !== null && (
           <div role="alert" className="flex items-center gap-3 rounded-2xl bg-red-600/80 px-4 py-3 text-sm font-semibold">
             <span className="flex-1">{state.failure.message}</span>
@@ -122,7 +124,7 @@ export function Tutor({ state, onAsk, onRetry, onClose }: TutorProps) {
         <textarea
           value={draft}
           rows={1}
-          maxLength={MAX_QUESTION_CHARS}
+          maxLength={MAX_MESSAGE_CHARS}
           placeholder={ru.tutor.placeholder}
           aria-label={ru.tutor.placeholder}
           onChange={(event) => {

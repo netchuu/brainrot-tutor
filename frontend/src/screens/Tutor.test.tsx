@@ -61,13 +61,17 @@ describe('Tutor', () => {
     expect(screen.getByText('«Первая цитата»')).toBeInTheDocument()
   })
 
-  it('shows a failure with retry and closes back', () => {
+  it('shows a failure with retry, hides the empty unfinished answer and closes back', () => {
     renderTutor({
-      turns: [{ role: 'user', content: 'Вопрос', sources: [], complete: true }],
+      turns: [
+        { role: 'user', content: 'Вопрос', sources: [], complete: true },
+        { role: 'assistant', content: '', sources: [], complete: false },
+      ],
       status: 'failed',
       failure: { kind: 'timeout', message: ru.errors.timeout, retryable: true },
     })
     expect(screen.getByRole('alert')).toHaveTextContent(ru.errors.timeout)
+    expect(screen.queryByText(ru.tutor.typing)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: ru.feed.retry }))
     expect(onRetry).toHaveBeenCalledOnce()
     fireEvent.click(screen.getByRole('button', { name: ru.tutor.back }))

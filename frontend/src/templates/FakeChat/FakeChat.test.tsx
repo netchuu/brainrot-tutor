@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { FakeChat } from '@/templates/FakeChat/FakeChat'
-import { revealedText, splitHighlight } from '@/templates/FakeChat/reveal'
+import { highlightRange, revealedText, splitHighlight } from '@/templates/FakeChat/reveal'
 import { fixtureEvents, fixtureScene, wordStart } from '@/test/fixtureEvents'
 import type { EpisodeOutline, Scene } from '@/types/contract'
 
@@ -27,11 +27,22 @@ describe('revealedText', () => {
   })
 })
 
-describe('splitHighlight', () => {
-  it('splits around the first occurrence and leaves text without it whole', () => {
-    expect(splitHighlight('ведёт к детонации и', 'детонации')).toEqual(['ведёт к ', 'детонации', ' и'])
-    expect(splitHighlight('без слова', 'детонации')).toEqual(['без слова', '', ''])
-    expect(splitHighlight('текст', null)).toEqual(['текст', '', ''])
+describe('highlightRange and splitHighlight', () => {
+  const words = [
+    { text: 'карта', start_ms: 0, end_ms: 100 },
+    { text: 'и', start_ms: 100, end_ms: 200 },
+    { text: 'кар', start_ms: 200, end_ms: 300 },
+  ]
+
+  it('marks the highlighted word itself, not a match inside an earlier word', () => {
+    const range = highlightRange('Карта и кар.', words, 'кар')
+    expect(range).toEqual([8, 11])
+    expect(splitHighlight('Карта и кар.', range)).toEqual(['Карта и ', 'кар', '.'])
+  })
+
+  it('leaves text whole before the word is typed or without a highlight', () => {
+    expect(splitHighlight('Карта и', highlightRange('Карта и кар.', words, 'кар'))).toEqual(['Карта и', '', ''])
+    expect(splitHighlight('текст', highlightRange('текст', words, null))).toEqual(['текст', '', ''])
   })
 })
 
@@ -56,6 +67,13 @@ describe('FakeChat', () => {
     renderChat(scene, 300, [fixtureScene('e2s0')])
     expect(screen.getByText(fixtureScene('e2s0').text)).toBeInTheDocument()
     expect(screen.getByRole('img', { name: scene.picture?.query })).toBeInTheDocument()
+  })
+
+  it('replaces a picture that fails to load with the highlight card', () => {
+    const scene = fixtureScene('e2s1')
+    renderChat(scene, 300)
+    fireEvent.error(screen.getByRole('img', { name: scene.picture?.query }))
+    expect(screen.getByTestId('picture-fallback')).toHaveTextContent('детонации')
   })
 
   it('adds the reaction to the bubble when the highlight word is spoken', () => {

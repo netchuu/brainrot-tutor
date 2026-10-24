@@ -11,7 +11,7 @@ function TopContent({ scene }: { scene: Scene }) {
     return (
       <div
         data-testid="term-card"
-        className="text-outline w-full rounded-[4cqw] bg-linear-135 from-amber-400 via-orange-500 to-rose-500 px-[5cqw] py-[6cqw] text-center text-[7cqw] leading-tight font-black text-white shadow-2xl"
+        className="text-outline w-full rounded-[4cqw] bg-linear-135 from-amber-400 via-orange-500 to-rose-500 px-[5cqw] py-[6cqw] text-center text-[7cqw] leading-tight font-black break-words text-white shadow-2xl"
       >
         {scene.term}
       </div>

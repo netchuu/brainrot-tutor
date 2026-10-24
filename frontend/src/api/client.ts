@@ -161,7 +161,8 @@ export async function* streamEpisodes(
   }
 }
 
-export function streamTutor(request: TutorRequest, signal: AbortSignal, idleMs = STREAM_IDLE_MS): AsyncGenerator<TutorEvent> {
+// The backend gives a tutor answer up to 50 s before its own error event, so wait longer than that.
+export function streamTutor(request: TutorRequest, signal: AbortSignal, idleMs = REQUEST_TIMEOUT_MS): AsyncGenerator<TutorEvent> {
   const open = (inner: AbortSignal) => (USE_FIXTURES ? fixtureTutorStream(inner) : postForStream('/api/tutor', request, inner))
   return streamEvents(open, isTutorEvent, 'Tutor stream', signal, idleMs)
 }

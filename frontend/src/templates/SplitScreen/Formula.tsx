@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { fitScale, loadRenderer } from '@/templates/SplitScreen/formulaRenderer'
+import { fitScale, FormulaLoadError, loadRenderer } from '@/templates/SplitScreen/formulaRenderer'
 
 export function Formula({ tex }: { tex: string }) {
   const box = useRef<HTMLDivElement>(null)
@@ -17,8 +17,7 @@ export function Formula({ tex }: { tex: string }) {
         setRenderedTex(tex)
       },
       (error: unknown) => {
-        // A failed chunk or font load keeps the TeX source on screen.
-        if (!(error instanceof TypeError)) throw error
+        if (!(error instanceof FormulaLoadError)) throw error
       },
     )
     return () => {

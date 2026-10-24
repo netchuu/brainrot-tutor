@@ -4,8 +4,8 @@ import { activeWordIndex } from '@/player/captions'
 import { FallbackImage } from '@/player/FallbackImage'
 import { reactionAtMs } from '@/player/usePlayback'
 import { ru } from '@/strings'
-import { revealedText, splitHighlight } from '@/templates/FakeChat/reveal'
-import { CharacterImage } from '@/templates/shared'
+import { highlightRange, revealedText, splitHighlight } from '@/templates/FakeChat/reveal'
+import { CharacterImage, HighlightCard } from '@/templates/shared'
 import type { TemplateProps } from '@/templates/types'
 import type { Cast, Scene, Speaker } from '@/types/contract'
 
@@ -31,7 +31,7 @@ function Bubble({ speaker, children, badge }: { speaker: Speaker; children: Reac
   return (
     <div
       data-speaker={speaker}
-      className={`relative max-w-[78%] rounded-[4cqw] px-[3.5cqw] py-[2.2cqw] text-[4.4cqw] leading-snug font-semibold shadow-lg ${SIDE[speaker]}`}
+      className={`relative max-w-[78%] rounded-[4cqw] px-[3.5cqw] py-[2.2cqw] text-[4.4cqw] leading-snug font-semibold break-words shadow-lg ${SIDE[speaker]}`}
     >
       {children}
       {badge !== undefined && (
@@ -57,7 +57,8 @@ function Message({ cast, scene, children }: { cast: Cast; scene: Scene; children
 
 function CurrentMessage({ cast, scene, timeMs }: { cast: Cast; scene: Scene; timeMs: number }) {
   const active = activeWordIndex(scene.words, timeMs)
-  const [before, highlight, after] = splitHighlight(revealedText(scene.text, scene.words, active), scene.highlight)
+  const range = highlightRange(scene.text, scene.words, scene.highlight)
+  const [before, highlight, after] = splitHighlight(revealedText(scene.text, scene.words, active), range)
   const reaction = scene.reaction !== 'none' && timeMs >= reactionAtMs(scene) ? REACTION_EMOJI[scene.reaction] : undefined
   return (
     <>
@@ -68,7 +69,7 @@ function CurrentMessage({ cast, scene, timeMs }: { cast: Cast; scene: Scene; tim
               src={scene.picture.url}
               alt={scene.picture.query}
               className="aspect-square w-full rounded-[4cqw] object-cover shadow-lg ring-[0.6cqw] ring-white/80"
-              fallback={null}
+              fallback={<HighlightCard scene={scene} className="aspect-square w-full text-[7cqw]!" />}
             >
               <p className="mt-[0.5cqh] truncate text-[2.4cqw] text-white/70">{scene.picture.credit}</p>
             </FallbackImage>
