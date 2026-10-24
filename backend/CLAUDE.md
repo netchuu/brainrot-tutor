@@ -79,11 +79,11 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy app && uv run
 Gates and times come from `docs/PLAN.md`. Tick boxes here as you finish them.
 
 ### M0 Scaffold (Day 1, 11:30)
-- [ ] `uv init` in `backend/`; add FastAPI, uvicorn, pydantic-settings, httpx, google-genai, groq, edge-tts; dev: pytest, pytest-asyncio, respx, jsonschema, ruff, mypy
-- [ ] `app/main.py` with CORS from `ALLOWED_ORIGINS` and `GET /api/health`
-- [ ] `app/schemas/contract.py` mirroring the schema; contract test passes on `contracts/fixtures/`
-- [ ] `POST /api/episodes/stream` with `?mock=1` streams `contracts/fixtures/episode-stream.ndjson` line by line, 300 ms apart, so the frontend can integrate now
-- [ ] Vercel entrypoint ready (zero-config FastAPI `app` in `app/main.py`; `vercel.json` with `maxDuration` 60); the user creates the Vercel project and sets env vars
+- [x] `uv init` in `backend/`; add FastAPI, uvicorn, pydantic-settings, httpx, google-genai, groq, edge-tts; dev: pytest, pytest-asyncio, respx, jsonschema, ruff, mypy
+- [x] `app/main.py` with CORS from `ALLOWED_ORIGINS` and `GET /api/health`
+- [x] `app/schemas/contract.py` mirroring the schema; contract test passes on `contracts/fixtures/`
+- [x] `POST /api/episodes/stream` with `?mock=1` streams `contracts/fixtures/episode-stream.ndjson` line by line, 300 ms apart, so the frontend can integrate now
+- [x] Vercel entrypoint ready (zero-config FastAPI `app` in `app/main.py`; `vercel.json` with `maxDuration` 60); the user creates the Vercel project and sets env vars
 
 ### M1 Hello pipeline (Day 1, 13:00)
 - [ ] `script_writer`: source text → validated episode script (Gemini), grounding checks pass on `contracts/fixtures/source.txt`
