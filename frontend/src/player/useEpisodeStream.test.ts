@@ -5,7 +5,9 @@ import { initialStreamState, streamReducer, toFailure, useEpisodeStream } from '
 import { FIXTURE_TEXT, fixtureEvents } from '@/test/fixtureEvents'
 import type { EpisodesRequest } from '@/types/contract'
 
-const request: EpisodesRequest = { source_text: 'x'.repeat(200), language: 'ru', episode_count: 3, template: null }
+vi.mock('@/api/fixtures', async (importOriginal) => ({ ...(await importOriginal<object>()), USE_FIXTURES: false }))
+
+const request: EpisodesRequest ={ source_text: 'x'.repeat(200), language: 'ru', episode_count: 3, template: null }
 
 describe('streamReducer', () => {
   it('collects the whole fixture into episodes', () => {

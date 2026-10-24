@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, ContractError, readNdjson, StreamParseError, streamEpisodes } from '@/api/client'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readNdjson, StreamParseError } from '@/api/client'
 import type { EpisodesRequest } from '@/types/contract'
 
 const encoder = new TextEncoder()
@@ -95,8 +95,15 @@ describe('readNdjson', () => {
 describe('streamEpisodes', () => {
   const request: EpisodesRequest = { source_text: 'x'.repeat(200), language: 'ru', episode_count: 1, template: null }
 
+  beforeEach(() => {
+    vi.stubEnv('VITE_USE_FIXTURES', '0')
+    vi.stubEnv('VITE_API_URL', '')
+    vi.resetModules()
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.unstubAllEnvs()
   })
 
   function respondWith(response: Response) {
@@ -105,57 +112,73 @@ describe('streamEpisodes', () => {
     return fetchMock
   }
 
-  function run() {
-    return collect(streamEpisodes(request, new AbortController().signal))
+  async function load() {
+    const client = await import('@/api/client')
+    return { client, run: () => collect(client.streamEpisodes(request, new AbortController().signal)) }
   }
 
   it('posts the request and yields contract events', async () => {
     const fetchMock = respondWith(new Response(`${PLAN_LINE}\n${DONE_LINE}\n`))
-    const events = await run()
-    expect(events.map((event) => event.type)).toEqual(['plan', 'done'])
+    const { run } = await load()
+    expect((await run()).map((event) => event.type)).toEqual(['plan', 'done'])
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/episodes/stream',
       expect.objectContaining({ method: 'POST', body: JSON.stringify(request) }),
     )
   })
 
+  it('joins VITE_API_URL without a double slash', async () => {
+    vi.stubEnv('VITE_API_URL', 'https://api.example.test/')
+    const fetchMock = respondWith(new Response(`${PLAN_LINE}\n${DONE_LINE}\n`))
+    const { run } = await load()
+    await run()
+    expect(fetchMock).toHaveBeenCalledWith('https://api.example.test/api/episodes/stream', expect.anything())
+  })
+
   it('stops at an error event', async () => {
     respondWith(new Response(`${PLAN_LINE}\n{"type":"error","code":"rate_limited","message":"x","retryable":true}\n`))
+    const { run } = await load()
     expect((await run()).map((event) => event.type)).toEqual(['plan', 'error'])
   })
 
   it('turns an ErrorResponse into ApiError', async () => {
     const body = JSON.stringify({ error: { code: 'too_long', message: 'Text is too long', retryable: false } })
     respondWith(new Response(body, { status: 413 }))
+    const { client, run } = await load()
     const failure = run()
-    await expect(failure).rejects.toBeInstanceOf(ApiError)
+    await expect(failure).rejects.toBeInstanceOf(client.ApiError)
     await expect(failure).rejects.toMatchObject({ code: 'too_long', retryable: false })
   })
 
   it('maps a non-contract 5xx body to a retryable internal error', async () => {
     respondWith(new Response('Bad Gateway', { status: 502 }))
+    const { run } = await load()
     await expect(run()).rejects.toMatchObject({ code: 'internal', retryable: true })
   })
 
   it('maps a non-contract 429 to a retryable rate limit', async () => {
     respondWith(new Response('Too Many Requests', { status: 429 }))
+    const { run } = await load()
     await expect(run()).rejects.toMatchObject({ code: 'rate_limited', retryable: true })
   })
 
   it('throws ContractError on an event that breaks the schema', async () => {
     respondWith(new Response(`${PLAN_LINE}\n{"type":"scene"}\n`))
-    await expect(run()).rejects.toBeInstanceOf(ContractError)
+    const { client, run } = await load()
+    await expect(run()).rejects.toBeInstanceOf(client.ContractError)
   })
 
   it('throws ContractError when the stream ends without done or error', async () => {
     respondWith(new Response(`${PLAN_LINE}\n{"type":"episode_done","episode":0}\n`))
-    await expect(run()).rejects.toBeInstanceOf(ContractError)
+    const { client, run } = await load()
+    await expect(run()).rejects.toBeInstanceOf(client.ContractError)
   })
 
   it('throws ContractError on events before the plan or outside it', async () => {
+    const { client, run } = await load()
     respondWith(new Response(`${DONE_LINE}\n`))
-    await expect(run()).rejects.toBeInstanceOf(ContractError)
+    await expect(run()).rejects.toBeInstanceOf(client.ContractError)
     respondWith(new Response(`${PLAN_LINE}\n{"type":"episode_done","episode":5}\n${DONE_LINE}\n`))
-    await expect(run()).rejects.toBeInstanceOf(ContractError)
+    await expect(run()).rejects.toBeInstanceOf(client.ContractError)
   })
 })

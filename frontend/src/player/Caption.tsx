@@ -18,11 +18,25 @@ export function Caption({ words, highlight, timeMs }: CaptionProps) {
 
   useLayoutEffect(() => {
     const element = ref.current
-    if (element === null) return
-    element.style.setProperty('--fit', '1')
-    const available = element.clientWidth
-    const widest = Math.max(0, ...Array.from(element.children, (child) => child.scrollWidth))
-    element.style.setProperty('--fit', widest > available && available > 0 ? String(available / widest) : '1')
+    const container = element?.parentElement
+    if (!element || !container) return
+    const fit = () => {
+      element.style.setProperty('--fit', '1')
+      const available = element.clientWidth
+      const widest = Math.max(0, ...Array.from(element.children, (child) => child.scrollWidth))
+      element.style.setProperty('--fit', widest > available && available > 0 ? String(available / widest) : '1')
+    }
+    fit()
+    let mounted = true
+    const observer = new ResizeObserver(fit)
+    observer.observe(container)
+    void document.fonts.ready.then(() => {
+      if (mounted) fit()
+    })
+    return () => {
+      mounted = false
+      observer.disconnect()
+    }
   }, [chunkStart, words])
 
   if (chunk === undefined) return null

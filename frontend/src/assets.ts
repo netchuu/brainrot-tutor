@@ -1,4 +1,4 @@
-import { SFX } from '@/types/contract'
+import { SFX, SPEAKERS } from '@/types/contract'
 import type { Reaction, Sfx, Speaker } from '@/types/contract'
 
 export type MascotPose = 'neutral' | 'shocked' | 'pointing'
@@ -8,6 +8,11 @@ export type SoundEffect = Exclude<Sfx, 'none'>
 
 const ROOT = `${import.meta.env.BASE_URL}assets`
 const BACKGROUND_VARIANTS = 3
+const MASCOT_POSES: readonly MascotPose[] = ['neutral', 'shocked', 'pointing']
+
+export function isLocalAsset(src: string): boolean {
+  return src.startsWith(`${ROOT}/`)
+}
 
 export const SOUND_EFFECTS: readonly SoundEffect[] = SFX.filter((sfx): sfx is SoundEffect => sfx !== 'none')
 
@@ -17,6 +22,10 @@ export function backgroundSrc(kind: BackgroundKind, episodeIndex: number): strin
 
 export function mascotSrc(character: Speaker, pose: MascotPose): string {
   return `${ROOT}/mascots/${character}-${pose}.png`
+}
+
+export function allMascotSrcs(): string[] {
+  return SPEAKERS.flatMap((character) => MASCOT_POSES.map((pose) => mascotSrc(character, pose)))
 }
 
 export function stickerSrc(reaction: StickerReaction): string {

@@ -7,34 +7,33 @@ import { mascotPose } from '@/templates/ParkourDuo/pose'
 import type { TemplateProps } from '@/templates/types'
 import type { Scene, Speaker } from '@/types/contract'
 
-function HighlightCard({ text }: { text: string | null }) {
-  if (text === null) return null
+function HighlightCard({ scene }: { scene: Scene }) {
+  const text = scene.highlight ?? scene.term
   return (
     <div
       data-testid="picture-fallback"
-      className="text-outline flex aspect-square w-full items-center justify-center rounded-[4cqw] bg-linear-135 from-fuchsia-500 via-violet-600 to-sky-500 p-[4cqw] text-center text-[10cqw] leading-none font-black break-words text-white uppercase shadow-2xl"
+      className={`text-outline flex aspect-square w-full items-center justify-center rounded-[4cqw] bg-linear-135 from-fuchsia-500 via-violet-600 to-sky-500 p-[4cqw] text-center leading-none font-black break-words text-white uppercase shadow-2xl ${text === null ? 'text-[30cqw]' : 'text-[10cqw]'}`}
     >
-      {text}
+      {text ?? (scene.reaction === 'none' ? '💡' : REACTION_EMOJI[scene.reaction])}
     </div>
   )
 }
 
 function PictureSlot({ scene }: { scene: Scene }) {
-  const card = <HighlightCard text={scene.highlight} />
+  const card = <HighlightCard scene={scene} />
   return (
     <div key={scene.id} className="animate-pop absolute top-[5cqh] left-1/2 w-[70cqw] -translate-x-1/2">
       {scene.picture === null ? (
         card
       ) : (
-        <>
-          <FallbackImage
-            src={scene.picture.url}
-            alt={scene.picture.query}
-            className="aspect-square w-full rounded-[4cqw] object-cover shadow-2xl ring-[0.8cqw] ring-white"
-            fallback={card}
-          />
+        <FallbackImage
+          src={scene.picture.url}
+          alt={scene.picture.query}
+          className="aspect-square w-full rounded-[4cqw] object-cover shadow-2xl ring-[0.8cqw] ring-white"
+          fallback={card}
+        >
           <p className="mt-[0.8cqh] truncate text-center text-[2.6cqw] text-white/70">{scene.picture.credit}</p>
-        </>
+        </FallbackImage>
       )}
     </div>
   )

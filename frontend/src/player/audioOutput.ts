@@ -22,11 +22,11 @@ export function audioOutput(): AudioOutput {
 export function unlockAudio(): void {
   const { element, context } = audioOutput()
   void context.resume()
-  silentUrl ??= URL.createObjectURL(new Blob([silentWav()], { type: 'audio/wav' }))
-  element.src = silentUrl
+  const silent = (silentUrl ??= URL.createObjectURL(new Blob([silentWav()], { type: 'audio/wav' })))
+  element.src = silent
   element.play().then(
     () => {
-      element.pause()
+      if (element.src === silent) element.pause()
     },
     (error: unknown) => {
       if (!(error instanceof DOMException)) throw error

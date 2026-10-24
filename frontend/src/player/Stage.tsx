@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { usePlayback } from '@/player/usePlayback'
 import { templateFor } from '@/templates/registry'
@@ -6,9 +6,12 @@ import type { EpisodeOutline, Scene } from '@/types/contract'
 
 function BackgroundLoop({ src }: { src: string | null }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null)
+  const [playingSrc, setPlayingSrc] = useState<string | null>(null)
   return (
     <div className="absolute inset-0" aria-hidden>
-      <div className="animate-pan absolute inset-0 bg-linear-135 from-emerald-500 via-sky-600 to-fuchsia-600 bg-size-[300%_300%]" />
+      {(src === null || playingSrc !== src) && (
+        <div className="animate-pan absolute inset-0 bg-linear-135 from-emerald-500 via-sky-600 to-fuchsia-600 bg-size-[300%_300%]" />
+      )}
       {src !== null && failedSrc !== src && (
         <video
           key={src}
@@ -19,6 +22,9 @@ function BackgroundLoop({ src }: { src: string | null }) {
           muted
           playsInline
           preload="metadata"
+          onPlaying={() => {
+            setPlayingSrc(src)
+          }}
           onError={() => {
             setFailedSrc(src)
           }}
@@ -84,6 +90,10 @@ export function Stage({ episode, scenes, complete }: StageProps) {
   const playback = usePlayback(scenes, complete)
   const template = templateFor(episode.template)
   const Template = template.component
+
+  useEffect(() => {
+    for (const url of template.assets) new Image().src = url
+  }, [template])
   return (
     <StageFrame background={template.background(episode.index)}>
       {playback.scene !== null && (

@@ -70,12 +70,12 @@ npm run lint && npm run typecheck && npm run test -- --run && npm run build
 Gates and times come from `docs/PLAN.md`. Tick boxes here as you finish them.
 
 ### M0 Scaffold (Day 1, 11:30)
-- [ ] Vite React TS app in `frontend/` with Tailwind 4, Vitest, ESLint, `@/` alias; scripts `dev`, `build`, `lint`, `typecheck`, `test`
-- [ ] `src/types/contract.ts`; NDJSON stream reader with tests on the fixture
-- [ ] Fixture mode replays `episode-stream.ndjson`
+- [x] Vite React TS app in `frontend/` with Tailwind 4, Vitest, ESLint, `@/` alias; scripts `dev`, `build`, `lint`, `typecheck`, `test`
+- [x] `src/types/contract.ts`; NDJSON stream reader with tests on the fixture
+- [x] Fixture mode replays `episode-stream.ndjson`
 
 ### M1 Hello pipeline (Day 1, 13:00)
-- [ ] `Stage` + `ParkourDuo` play episode 0 of the fixture: background loop, picture slot, captions with highlight, mascots swapping by `speaker`, reaction sticker, sfx
+- [x] `Stage` + `ParkourDuo` play episode 0 of the fixture: background loop, picture slot, captions with highlight, mascots swapping by `speaker`, reaction sticker, sfx
 
 ### M2 End to end (Day 1, 18:00) — the key gate
 - [ ] Upload screen: paste text or pick a PDF → stream from the backend → playback starts on the first `scene`; loading, error and retry states

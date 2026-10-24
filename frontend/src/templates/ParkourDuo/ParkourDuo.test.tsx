@@ -48,9 +48,30 @@ describe('ParkourDuo', () => {
     expect(screen.getByTestId('picture-fallback')).toHaveTextContent('миллисекунду')
   })
 
+  it('hides the photo credit once the picture failed', () => {
+    renderScene(fixtureScene('e0s3'), 300)
+    expect(screen.getByText('Lorem Picsum (fixture only)')).toBeInTheDocument()
+    fireEvent.error(screen.getByRole('img', { name: 'data table chart' }))
+    expect(screen.queryByText('Lorem Picsum (fixture only)')).not.toBeInTheDocument()
+  })
+
   it('shows the highlight card when the scene has no picture', () => {
     renderScene(fixtureScene('e0s1'), 300)
     expect(screen.getByTestId('picture-fallback')).toHaveTextContent('делает')
+  })
+
+  it('falls back to the term, then to the reaction emoji, when there is no highlight', () => {
+    const { rerender } = renderScene({ ...fixtureScene('e0s1'), highlight: null, term: 'ЭБУ = мозг' }, 300)
+    expect(screen.getByTestId('picture-fallback')).toHaveTextContent('ЭБУ = мозг')
+    rerender(
+      <ParkourDuo
+        episode={episode}
+        scene={{ ...fixtureScene('e0s1'), highlight: null, term: null }}
+        sceneIndex={1}
+        timeMs={300}
+      />,
+    )
+    expect(screen.getByTestId('picture-fallback')).toHaveTextContent('🤔')
   })
 
   it('replaces a missing mascot or sticker file with an emoji', () => {

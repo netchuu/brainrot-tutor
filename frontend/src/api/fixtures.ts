@@ -25,11 +25,15 @@ export function replayLines(text: string, signal: AbortSignal, gapMs: number): R
   const lines = text.split('\n').filter((line) => line.trim() !== '')
   const encoder = new TextEncoder()
   const stopped = new AbortController()
-  const stop = AbortSignal.any([signal, stopped.signal])
+  const stop = () => {
+    stopped.abort()
+  }
+  if (signal.aborted) stop()
+  else signal.addEventListener('abort', stop, { once: true })
   let next = 0
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
-      if (next > 0) await delay(gapMs, stop)
+      if (next > 0) await delay(gapMs, stopped.signal)
       const line = lines[next]
       if (line === undefined) {
         controller.close()
@@ -39,7 +43,8 @@ export function replayLines(text: string, signal: AbortSignal, gapMs: number): R
       next += 1
     },
     cancel() {
-      stopped.abort()
+      signal.removeEventListener('abort', stop)
+      stop()
     },
   })
 }
