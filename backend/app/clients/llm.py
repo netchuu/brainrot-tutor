@@ -23,7 +23,19 @@ logger = logging.getLogger(__name__)
 
 LLM_TIMEOUT_S = 20
 # Groq strict mode documents only structural keywords; Pydantic checks these limits after the call anyway.
-GROQ_DROPPED_KEYWORDS = frozenset({"minLength", "maxLength", "minItems", "maxItems", "pattern"})
+GROQ_DROPPED_KEYWORDS = frozenset(
+    {
+        "minLength",
+        "maxLength",
+        "minItems",
+        "maxItems",
+        "pattern",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+    }
+)
 ProviderCall = Callable[[str, str, dict[str, Any]], Awaitable[str]]
 
 

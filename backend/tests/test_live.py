@@ -7,14 +7,22 @@ import pytest
 
 from app.clients.llm import call_groq, generate_with
 from app.config import get_settings
-from app.schemas.contract import CharacterId, EpisodesRequest
+from app.schemas.contract import (
+    CharacterId,
+    EpisodesRequest,
+    GradeRequest,
+    OpenQuestion,
+    QuizEpisode,
+    QuizRequest,
+    QuizSceneRef,
+)
 from app.schemas.script import EpisodeDraft
-from app.services import pipeline, script_writer
+from app.services import grader, pipeline, quiz_maker, script_writer
 from app.services.grounding import normalize
 from app.services.narrator import narrate
 from app.services.pictures import find_picture
-from tests.conftest import SOURCE_TEXT
-from validate import check_stream_order, validator
+from tests.conftest import FIXTURES_DIR, SOURCE_TEXT
+from validate import check_stream_order, read_ndjson, validator
 
 pytestmark = pytest.mark.live
 
@@ -107,3 +115,42 @@ async def test_live_pipeline_streams_a_valid_course() -> None:
     assert errors == []
     assert events[-1]["type"] == "done"
     print(f"\nfirst scene after {first_scene_s:.1f}s, done after {time.perf_counter() - started:.1f}s")
+
+
+def require_llm_key() -> None:
+    settings = get_settings()
+    if settings.gemini_api_key is None and settings.groq_api_key is None:
+        pytest.skip("GEMINI_API_KEY and GROQ_API_KEY are not set in backend/.env")
+
+
+async def test_live_quiz_for_fixture_episode() -> None:
+    require_llm_key()
+    scenes = [
+        QuizSceneRef(id=e["scene"]["id"], text=e["scene"]["text"], source_quote=e["scene"]["source_quote"])
+        for e in read_ndjson(FIXTURES_DIR / "episode-stream.ndjson")
+        if e["type"] == "scene" and e["episode"] == 0
+    ]
+    request = QuizRequest(
+        source_text=SOURCE_TEXT, language="ru", episode=QuizEpisode(index=0, title="ЭБУ — мозг машины", scenes=scenes)
+    )
+    started = time.perf_counter()
+
+    quiz = await quiz_maker.make_quiz(request)
+
+    validator("QuizResponse").validate(quiz.model_dump(mode="json"))
+    print(f"\nquiz in {time.perf_counter() - started:.1f}s: {[question.prompt for question in quiz.questions]}")
+
+
+async def test_live_grade_open_answer() -> None:
+    require_llm_key()
+    quiz = json.loads((FIXTURES_DIR / "quiz.json").read_text(encoding="utf-8"))
+    request = GradeRequest(
+        language="ru",
+        question=OpenQuestion.model_validate(quiz["questions"][3]),
+        answer="Сколько топлива впрыснуть и когда поджечь смесь",
+    )
+
+    result = await grader.grade_answer(request)
+
+    assert result.correct is True
+    print(f"\ngrade: {result.model_dump()}")

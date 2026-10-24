@@ -2,6 +2,8 @@ import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
 
+from app.config import get_settings
+from app.errors import BadInputError, SourceTooLongError
 from app.schemas.script import ScriptScene
 
 MAX_TEXT_CHARS = 220
@@ -14,6 +16,14 @@ SPOKEN_WORD = re.compile(r"\w+(?:[-'\u2019]\w+)*")
 
 def normalize(text: str) -> str:
     return WHITESPACE.sub(" ", text).strip()
+
+
+def require_usable_source(source_text: str) -> None:
+    max_chars = get_settings().max_source_chars
+    if len(source_text) > max_chars:
+        raise SourceTooLongError(f"source_text is longer than {max_chars} characters")
+    if not source_text.strip():
+        raise BadInputError("source_text contains no text")
 
 
 @dataclass(frozen=True)

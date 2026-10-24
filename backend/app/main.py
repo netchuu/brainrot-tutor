@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.episodes import router as episodes_router
 from app.api.health import router as health_router
+from app.api.quiz import router as quiz_router
 from app.config import get_settings
 from app.errors import AppError
 from app.schemas.contract import ErrorBody, ErrorResponse
@@ -65,6 +66,7 @@ def create_app() -> FastAPI:
     application.exception_handler(Exception)(handle_unexpected_error)
     application.include_router(health_router)
     application.include_router(episodes_router)
+    application.include_router(quiz_router)
     return application
 
 
