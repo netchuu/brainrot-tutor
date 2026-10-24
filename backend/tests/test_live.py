@@ -1,9 +1,12 @@
+import asyncio
 import time
+from typing import get_args
 
 import pytest
 
 from app.clients.llm import call_groq, generate_with
 from app.config import get_settings
+from app.schemas.contract import CharacterId
 from app.schemas.script import EpisodeDraft
 from app.services import script_writer
 from app.services.grounding import normalize
@@ -52,12 +55,23 @@ async def test_live_groq_accepts_episode_schema() -> None:
 async def test_live_narration_has_word_timings() -> None:
     started = time.perf_counter()
 
-    narration = await narrate("Представь, что у машины есть мозг. Он называется ЭБУ.", "teacher", "ru")
+    narration = await narrate("Представь, что у машины есть мозг. Он называется ЭБУ.", "professor", "ru")
 
     assert narration.audio is not None
     assert narration.words_estimated is False
     words = ", ".join(f"{w.text} {w.start_ms}-{w.end_ms}" for w in narration.words[:3])
     print(f"\nvoice in {time.perf_counter() - started:.1f}s: {narration.audio.duration_ms} ms, words: {words}")
+
+
+async def test_live_every_character_speaks_russian_with_timings() -> None:
+    characters = get_args(CharacterId)
+
+    narrations = await asyncio.gather(*(narrate("Детонация разрушает поршни.", c, "ru") for c in characters))
+
+    for character, narration in zip(characters, narrations, strict=True):
+        print(f"\n{character}: audio {narration.audio is not None}, estimated {narration.words_estimated}")
+        assert narration.audio is not None
+        assert narration.words_estimated is False
 
 
 async def test_live_pexels_finds_a_picture() -> None:

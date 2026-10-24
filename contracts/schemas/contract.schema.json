@@ -6,6 +6,8 @@
     "Language": { "enum": ["ru", "en"] },
     "TemplateId": { "enum": ["parkour_duo", "split_screen", "fake_chat", "top3_countdown", "myth_or_fact"] },
     "Speaker": { "enum": ["teacher", "student"] },
+    "CharacterId": { "enum": ["professor", "mechanic", "robot", "kid", "gamer", "cat"] },
+    "BackgroundId": { "enum": ["parkour", "surf", "runner", "satisfying"] },
     "Reaction": { "enum": ["none", "mind_blown", "shocked", "laugh", "thinking", "fire", "check", "cross"] },
     "Sfx": { "enum": ["none", "whoosh", "pop", "boom", "drumroll", "ding", "buzzer"] },
     "ErrorCode": { "enum": ["bad_input", "too_long", "rate_limited", "llm_unavailable", "internal"] },
@@ -62,15 +64,26 @@
         "source_quote": { "type": ["string", "null"] }
       }
     },
+    "Cast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["teacher", "student"],
+      "properties": {
+        "teacher": { "$ref": "#/$defs/CharacterId" },
+        "student": { "$ref": "#/$defs/CharacterId" }
+      }
+    },
     "EpisodeOutline": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["index", "title", "template", "scene_count"],
+      "required": ["index", "title", "template", "scene_count", "cast", "background"],
       "properties": {
         "index": { "type": "integer", "minimum": 0 },
         "title": { "type": "string", "minLength": 1 },
         "template": { "$ref": "#/$defs/TemplateId" },
-        "scene_count": { "type": "integer", "minimum": 1, "maximum": 8 }
+        "scene_count": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "cast": { "$ref": "#/$defs/Cast" },
+        "background": { "$ref": "#/$defs/BackgroundId" }
       }
     },
 

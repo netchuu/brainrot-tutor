@@ -12,3 +12,4 @@ One line per decision: date · decision · why.
 - 2026-10-24 · Voice: edge-tts Svetlana for both characters with different pitch · Dmitry failed on some sentences in tests; no Kyrgyz voice
 - 2026-10-24 · Own React player instead of Remotion · Remotion's free license covers teams of up to 3
 - 2026-10-24 · Pictures from Pexels; no AI images in the live path · keyless AI images took ~9 s and allow 1 per 45 s
+- 2026-10-24 · Each episode names its cast (6 original characters, each with its own edge-tts voice) and background clip in `plan`; the backend rotates them per episode · varied TikTok-style episodes without TV characters or voice cloning; replaces the single Svetlana teacher/student pair

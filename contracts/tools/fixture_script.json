@@ -5,6 +5,8 @@
     {
       "title": "ЭБУ — мозг машины",
       "template": "parkour_duo",
+      "cast": {"teacher": "professor", "student": "kid"},
+      "background": "parkour",
       "scenes": [
         {"speaker": "teacher", "text": "Представь, что у машины есть мозг. Он называется ЭБУ.", "highlight": "мозг", "picture_query": "car engine control unit", "picture_seed": "ecu-brain", "reaction": "mind_blown", "sfx": "whoosh", "source_quote": "Электронный блок управления (ЭБУ) — это компьютер, который управляет работой двигателя автомобиля."},
         {"speaker": "student", "text": "Подожди, и что этот мозг вообще делает?", "highlight": "делает", "picture_query": null, "picture_seed": null, "reaction": "thinking", "sfx": "pop", "source_quote": null},
@@ -15,6 +17,8 @@
     {
       "title": "Прошивка и формула мощности",
       "template": "split_screen",
+      "cast": {"teacher": "mechanic", "student": "gamer"},
+      "background": "satisfying",
       "scenes": [
         {"speaker": "teacher", "text": "Прошивка ЭБУ — это изменение карт ради мощности.", "highlight": "мощности", "term": "Чип-тюнинг = изменение карт ЭБУ", "reaction": "fire", "sfx": "whoosh", "source_quote": "Чип-тюнинг, или прошивка ЭБУ, — это изменение этих карт, чтобы получить больше мощности или крутящего момента."},
         {"speaker": "teacher", "text": "Мощность считают так: момент умножить на обороты и поделить на 7023.", "highlight": "Мощность", "formula": "P = \\frac{M \\times n}{7023}", "reaction": "thinking", "sfx": "pop", "source_quote": "Мощность двигателя в лошадиных силах считают по формуле P = M × n / 7023, где M — крутящий момент в Н·м, а n — обороты в минуту."},
@@ -24,6 +28,8 @@
     {
       "title": "Почему нельзя перестараться",
       "template": "fake_chat",
+      "cast": {"teacher": "robot", "student": "cat"},
+      "background": "surf",
       "scenes": [
         {"speaker": "student", "text": "Так давай выкрутим всё на максимум!", "highlight": "максимум", "picture_query": null, "picture_seed": null, "reaction": "fire", "sfx": "pop", "source_quote": null},
         {"speaker": "teacher", "text": "Нельзя. Слишком агрессивная прошивка ведёт к детонации и перегреву.", "highlight": "детонации", "picture_query": "overheated car engine", "picture_seed": "engine-heat", "reaction": "shocked", "sfx": "buzzer", "source_quote": "Но у заводских настроек есть запас прочности: слишком агрессивная прошивка может привести к детонации и перегреву двигателя."},

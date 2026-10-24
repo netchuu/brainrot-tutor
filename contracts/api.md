@@ -14,11 +14,13 @@ Source of truth for both sides. Machine-readable version: `schemas/contract.sche
 | Language | `ru`, `en` |
 | TemplateId | `parkour_duo`, `split_screen`, `fake_chat`, `top3_countdown`, `myth_or_fact` |
 | Speaker | `teacher`, `student` |
+| CharacterId | `professor`, `mechanic`, `robot`, `kid`, `gamer`, `cat` |
+| BackgroundId | `parkour`, `surf`, `runner`, `satisfying` |
 | Reaction | `none`, `mind_blown`, `shocked`, `laugh`, `thinking`, `fire`, `check`, `cross` |
 | Sfx | `none`, `whoosh`, `pop`, `boom`, `drumroll`, `ding`, `buzzer` |
 | ErrorCode | `bad_input`, `too_long`, `rate_limited`, `llm_unavailable`, `internal` |
 
-Reaction and Sfx values are also the asset file names (`stickers/<reaction>.png`, `sfx/<sfx>.mp3`).
+Enum values are also the asset file names: `stickers/<reaction>.png`, `sfx/<sfx>.mp3`, `mascots/<character>-<pose>.png` (pose `neutral`, `shocked`, `pointing`), `backgrounds/<background>-<n>.mp4` (the player may rotate between the numbered clips of one background).
 
 ## POST /api/episodes/stream
 
@@ -39,11 +41,18 @@ Response: NDJSON [`StreamEvent`], always in this order:
 An `error` [`ErrorEvent`] can replace any event; it is always the last line.
 
 ```json
-{"type": "plan", "course_title": "Чип-тюнинг ЭБУ за 3 минуты", "language": "ru", "episodes": [{"index": 0, "title": "ЭБУ — мозг машины", "template": "parkour_duo", "scene_count": 4}]}
+{"type": "plan", "course_title": "Чип-тюнинг ЭБУ за 3 минуты", "language": "ru", "episodes": [{"index": 0, "title": "ЭБУ — мозг машины", "template": "parkour_duo", "scene_count": 4, "cast": {"teacher": "professor", "student": "kid"}, "background": "parkour"}]}
 {"type": "scene", "episode": 0, "index": 0, "scene": {"id": "e0s0", "speaker": "teacher", "text": "Представь, что у машины есть мозг.", "highlight": "мозг", "words": [{"text": "Представь", "start_ms": 100, "end_ms": 650}], "words_estimated": false, "audio": {"mime": "audio/mpeg", "base64": "…", "duration_ms": 3400}, "picture": {"query": "car engine control unit", "url": "https://…", "credit": "Photo by … on Pexels"}, "formula": null, "term": null, "rank": null, "verdict": null, "reaction": "mind_blown", "sfx": "whoosh", "source_quote": "Электронный блок управления (ЭБУ) — это компьютер, …"}}
 {"type": "episode_done", "episode": 0}
 {"type": "done", "elapsed_ms": 9120}
 ```
+
+### Cast and background [`EpisodeOutline`, `Cast`]
+
+- Each episode in `plan` names its `cast` (which character plays the `teacher` and the `student` role) and its `background` clip.
+- The backend picks both and varies them between the episodes of one course. A scene's `speaker` is the role; the character speaking it is `cast[speaker]`.
+- Each character has its own voice, chosen by the backend; the frontend shows that character's mascot.
+- `split_screen` episodes use the `satisfying` background; other templates use gameplay backgrounds (`parkour`, `surf`, `runner`).
 
 ### Scene fields [`Scene`]
 

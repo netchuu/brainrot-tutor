@@ -59,12 +59,12 @@ backend/
 
 ### Voice
 - edge-tts with `boundary="WordBoundary"`; offsets are 100-ns ticks → divide by 10,000 for ms
-- `ru`: teacher `ru-RU-SvetlanaNeural`; student the same voice with `pitch="+15Hz"`, `rate="+8%"` (Dmitry fails on some sentences). `en`: pick two en-US voices, check with `uv run edge-tts --list-voices`
-- Voices come from env (`VOICE_RU`, `VOICE_EN`) with those defaults
+- Each character (`CharacterId`) has its own voice, pitch and rate in `app/services/cast.py`. Multilingual voices (Brian, Emma, Florian, Remy, Vivienne, Ava) speak Russian with word timings; `ru-RU-DmitryNeural` drops sentences
+- The backend picks a cast pair and a background per episode and sends them in `plan` (`contracts/api.md`, "Cast and background")
 - `contracts/tools/build_fixtures.py` is a tested reference for the edge-tts calls
 
 ### Config (keep `.env.example` in sync)
-`GEMINI_API_KEY`, `GEMINI_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `PEXELS_API_KEY`, `ALLOWED_ORIGINS` (comma-separated), `MAX_SOURCE_CHARS=60000`, `VOICE_RU`, `VOICE_EN`
+`GEMINI_API_KEY`, `GEMINI_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `PEXELS_API_KEY`, `ALLOWED_ORIGINS` (comma-separated), `MAX_SOURCE_CHARS=60000`
 
 ### Checks (run before saying done)
 ```bash

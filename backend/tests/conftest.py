@@ -16,8 +16,6 @@ CONFIG_ENV = (
     "PEXELS_API_KEY",
     "ALLOWED_ORIGINS",
     "MAX_SOURCE_CHARS",
-    "VOICE_RU",
-    "VOICE_EN",
 )
 TEST_ORIGINS = "http://localhost:5173,https://brainrot.example"
 

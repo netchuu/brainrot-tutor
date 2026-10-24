@@ -28,8 +28,6 @@ class Settings(BaseSettings):
     pexels_api_key: SecretStr | None = None
     allowed_origins: Annotated[list[str], NoDecode, BeforeValidator(split_comma)] = []
     max_source_chars: int = Field(default=60_000, gt=0)
-    voice_ru: str = "ru-RU-SvetlanaNeural"
-    voice_en: str = "en-US-AvaNeural"
 
 
 @cache

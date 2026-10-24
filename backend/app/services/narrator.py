@@ -4,14 +4,13 @@ import logging
 from dataclasses import dataclass
 
 from app.clients.tts import synthesize
-from app.config import get_settings
 from app.errors import VoiceError
-from app.schemas.contract import Audio, Language, Speaker, Word
+from app.schemas.contract import Audio, CharacterId, Language, Word
+from app.services.cast import voice_for
 from app.services.grounding import SPOKEN_WORD
 
 logger = logging.getLogger(__name__)
 
-SPEAKER_STYLES: dict[Speaker, tuple[str, str]] = {"teacher": ("+0Hz", "+0%"), "student": ("+15Hz", "+8%")}
 VOICE_ATTEMPTS = 2
 VOICE_SCENE_TIMEOUT_S = 15
 # edge-tts streams 48 kbit/s mono MP3, so the byte count gives the duration.
@@ -44,10 +43,8 @@ def estimate_words(text: str, duration_ms: int | None) -> list[Word]:
     return words
 
 
-async def narrate(text: str, speaker: Speaker, language: Language) -> Narration:
-    settings = get_settings()
-    voice = settings.voice_ru if language == "ru" else settings.voice_en
-    pitch, rate = SPEAKER_STYLES[speaker]
+async def narrate(text: str, character: CharacterId, language: Language) -> Narration:
+    voice, pitch, rate = voice_for(character, language)
     try:
         async with asyncio.timeout(VOICE_SCENE_TIMEOUT_S):
             for attempt in range(1, VOICE_ATTEMPTS + 1):

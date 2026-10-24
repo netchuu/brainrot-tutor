@@ -11,16 +11,25 @@ import edge_tts
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "tools" / "fixture_script.json"
 OUTPUT = ROOT / "fixtures" / "episode-stream.ndjson"
-VOICE = "ru-RU-SvetlanaNeural"
-SPEAKER_STYLE = {"teacher": {"pitch": "+0Hz", "rate": "+0%"}, "student": {"pitch": "+15Hz", "rate": "+8%"}}
+# Russian voice of each character, as in backend/app/services/cast.py
+CHARACTER_VOICES = {
+    "professor": {"voice": "ru-RU-SvetlanaNeural", "pitch": "+0Hz", "rate": "+0%"},
+    "mechanic": {"voice": "en-US-BrianMultilingualNeural", "pitch": "-5Hz", "rate": "+0%"},
+    "robot": {"voice": "de-DE-FlorianMultilingualNeural", "pitch": "-10Hz", "rate": "-5%"},
+    "kid": {"voice": "en-US-EmmaMultilingualNeural", "pitch": "+20Hz", "rate": "+10%"},
+    "gamer": {"voice": "fr-FR-RemyMultilingualNeural", "pitch": "+10Hz", "rate": "+12%"},
+    "cat": {"voice": "fr-FR-VivienneMultilingualNeural", "pitch": "+25Hz", "rate": "+8%"},
+}
 # edge-tts default output is 48 kbit/s mono MP3, so bytes map directly to duration
 MP3_BYTES_PER_MS = 48_000 / 8 / 1000
 TICKS_PER_MS = 10_000
 
 
-async def synthesize(text: str, speaker: str) -> tuple[bytes, list[dict[str, Any]]]:
-    style = SPEAKER_STYLE[speaker]
-    communicate = edge_tts.Communicate(text, VOICE, rate=style["rate"], pitch=style["pitch"], boundary="WordBoundary")
+async def synthesize(text: str, character: str) -> tuple[bytes, list[dict[str, Any]]]:
+    style = CHARACTER_VOICES[character]
+    communicate = edge_tts.Communicate(
+        text, style["voice"], rate=style["rate"], pitch=style["pitch"], boundary="WordBoundary"
+    )
     audio = bytearray()
     words: list[dict[str, Any]] = []
     async for chunk in communicate.stream():
@@ -74,13 +83,21 @@ async def main() -> int:
             "course_title": script["course_title"],
             "language": script["language"],
             "episodes": [
-                {"index": i, "title": ep["title"], "template": ep["template"], "scene_count": len(ep["scenes"])}
+                {
+                    "index": i,
+                    "title": ep["title"],
+                    "template": ep["template"],
+                    "scene_count": len(ep["scenes"]),
+                    "cast": ep["cast"],
+                    "background": ep["background"],
+                }
                 for i, ep in enumerate(script["episodes"])
             ],
         }
     ]
     for ep_index, episode in enumerate(script["episodes"]):
-        results = await asyncio.gather(*(synthesize(s["text"], s["speaker"]) for s in episode["scenes"]))
+        cast = episode["cast"]
+        results = await asyncio.gather(*(synthesize(s["text"], cast[s["speaker"]]) for s in episode["scenes"]))
         for sc_index, (spec, (audio, words)) in enumerate(zip(episode["scenes"], results, strict=True)):
             if not audio or not words:
                 print(f"no audio or timings for e{ep_index}s{sc_index}", file=sys.stderr)

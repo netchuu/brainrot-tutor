@@ -6,6 +6,8 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, WithJsonSchem
 Language = Literal["ru", "en"]
 TemplateId = Literal["parkour_duo", "split_screen", "fake_chat", "top3_countdown", "myth_or_fact"]
 Speaker = Literal["teacher", "student"]
+CharacterId = Literal["professor", "mechanic", "robot", "kid", "gamer", "cat"]
+BackgroundId = Literal["parkour", "surf", "runner", "satisfying"]
 Reaction = Literal["none", "mind_blown", "shocked", "laugh", "thinking", "fire", "check", "cross"]
 Sfx = Literal["none", "whoosh", "pop", "boom", "drumroll", "ding", "buzzer"]
 ErrorCode = Literal["bad_input", "too_long", "rate_limited", "llm_unavailable", "internal"]
@@ -64,11 +66,18 @@ class Scene(ContractModel):
     source_quote: str | None
 
 
+class Cast(ContractModel):
+    teacher: CharacterId
+    student: CharacterId
+
+
 class EpisodeOutline(ContractModel):
     index: int = Field(ge=0)
     title: str = Field(min_length=1)
     template: TemplateId
     scene_count: int = Field(ge=1, le=8)
+    cast: Cast
+    background: BackgroundId
 
 
 class PlanEvent(ContractModel):

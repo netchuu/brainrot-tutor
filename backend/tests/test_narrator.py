@@ -46,7 +46,7 @@ def fake_edge_tts(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_voice_returns_mp3_and_word_timings_in_ms() -> None:
-    narration = await narrate(LINE, "teacher", "ru")
+    narration = await narrate(LINE, "professor", "ru")
 
     assert narration.audio is not None
     assert base64.b64decode(narration.audio.base64) == AUDIO
@@ -57,17 +57,19 @@ async def test_voice_returns_mp3_and_word_timings_in_ms() -> None:
     assert (call.voice, call.pitch, call.rate, call.boundary) == ("ru-RU-SvetlanaNeural", "+0Hz", "+0%", "WordBoundary")
 
 
-async def test_student_uses_shifted_pitch_and_english_voice() -> None:
-    await narrate("Wait, what does it do?", "student", "en")
+async def test_each_character_speaks_with_its_own_voice() -> None:
+    await narrate("Wait, what does it do?", "kid", "en")
+    await narrate("Wait, what does it do?", "professor", "en")
 
-    call = FakeCommunicate.created[0]
-    assert (call.voice, call.pitch, call.rate) == ("en-US-AvaNeural", "+15Hz", "+8%")
+    kid, professor = FakeCommunicate.created
+    assert (kid.voice, kid.pitch, kid.rate) == ("en-US-EmmaMultilingualNeural", "+20Hz", "+10%")
+    assert (professor.voice, professor.pitch, professor.rate) == ("en-US-AvaMultilingualNeural", "+0Hz", "+0%")
 
 
 async def test_voice_failure_is_retried_once() -> None:
     FakeCommunicate.failures = [NoAudioReceived("empty")]
 
-    narration = await narrate(LINE, "teacher", "ru")
+    narration = await narrate(LINE, "professor", "ru")
 
     assert narration.audio is not None
     assert len(FakeCommunicate.created) == 2
@@ -76,7 +78,7 @@ async def test_voice_failure_is_retried_once() -> None:
 async def test_double_failure_gives_estimated_captions() -> None:
     FakeCommunicate.failures = [aiohttp.ClientConnectionError("down"), NoAudioReceived("empty")]
 
-    narration = await narrate(LINE, "teacher", "ru")
+    narration = await narrate(LINE, "professor", "ru")
 
     assert narration.audio is None
     assert narration.words_estimated is True
@@ -90,7 +92,7 @@ async def test_voice_timeout_counts_as_failure(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr(tts, "VOICE_TIMEOUT_S", 0.01)
     FakeCommunicate.delay_s = 0.1
 
-    narration = await narrate(LINE, "teacher", "ru")
+    narration = await narrate(LINE, "professor", "ru")
 
     assert narration.audio is None
     assert len(FakeCommunicate.created) == 2
@@ -101,7 +103,7 @@ async def test_both_attempts_share_one_scene_deadline(monkeypatch: pytest.Monkey
     monkeypatch.setattr(narrator, "VOICE_SCENE_TIMEOUT_S", 0.05)
     FakeCommunicate.delay_s = 1.0
 
-    narration = await narrate(LINE, "teacher", "ru")
+    narration = await narrate(LINE, "professor", "ru")
 
     assert narration.audio is None
     assert narration.words_estimated is True
@@ -111,7 +113,7 @@ async def test_both_attempts_share_one_scene_deadline(monkeypatch: pytest.Monkey
 async def test_audio_without_boundaries_gets_estimated_timings() -> None:
     FakeCommunicate.boundaries = []
 
-    narration = await narrate(LINE, "teacher", "ru")
+    narration = await narrate(LINE, "professor", "ru")
 
     assert narration.audio is not None
     assert narration.words_estimated is True

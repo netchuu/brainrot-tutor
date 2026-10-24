@@ -26,6 +26,8 @@ ENUM_ALIASES = {
     "Language": contract.Language,
     "TemplateId": contract.TemplateId,
     "Speaker": contract.Speaker,
+    "CharacterId": contract.CharacterId,
+    "BackgroundId": contract.BackgroundId,
     "Reaction": contract.Reaction,
     "Sfx": contract.Sfx,
     "ErrorCode": contract.ErrorCode,
