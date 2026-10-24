@@ -40,6 +40,14 @@ describe('highlightRange and splitHighlight', () => {
     expect(splitHighlight('Карта и кар.', range)).toEqual(['Карта и ', 'кар', '.'])
   })
 
+  it('still finds the highlight when an earlier spoken word is not written the same way', () => {
+    const spoken = [
+      { text: 'двести', start_ms: 0, end_ms: 100 },
+      { text: 'кар', start_ms: 100, end_ms: 200 },
+    ]
+    expect(highlightRange('200 кар', spoken, 'кар')).toEqual([4, 7])
+  })
+
   it('leaves text whole before the word is typed or without a highlight', () => {
     expect(splitHighlight('Карта и', highlightRange('Карта и кар.', words, 'кар'))).toEqual(['Карта и', '', ''])
     expect(splitHighlight('текст', highlightRange('текст', words, null))).toEqual(['текст', '', ''])

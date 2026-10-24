@@ -3,7 +3,6 @@ import { ru } from '@/strings'
 import { MAX_MESSAGE_CHARS } from '@/tutor/useTutor'
 import type { TutorState, TutorTurn } from '@/tutor/useTutor'
 
-
 function Sources({ quotes }: { quotes: string[] }) {
   if (quotes.length === 0) return null
   return (

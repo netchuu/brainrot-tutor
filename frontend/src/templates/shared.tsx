@@ -31,11 +31,19 @@ export function PictureCard({ scene, className }: { scene: Scene; className: str
   )
 }
 
-export function ReactionSticker({ scene, timeMs }: { scene: Scene; timeMs: number }) {
+export function ReactionSticker({
+  scene,
+  timeMs,
+  position = 'top-[2cqh] right-[4cqw]',
+}: {
+  scene: Scene
+  timeMs: number
+  position?: string
+}) {
   if (scene.reaction === 'none' || timeMs < reactionAtMs(scene)) return null
   const reaction = scene.reaction
   return (
-    <div key={scene.id} data-testid="reaction" className="animate-pop absolute top-[2cqh] right-[4cqw] z-20 w-[24cqw]">
+    <div key={scene.id} data-testid="reaction" className={`animate-pop absolute z-20 w-[24cqw] ${position}`}>
       <FallbackImage
         src={stickerSrc(reaction)}
         alt={reaction}

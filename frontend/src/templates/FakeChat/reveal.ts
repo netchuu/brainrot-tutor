@@ -29,7 +29,10 @@ export function highlightRange(text: string, words: readonly Word[], highlight: 
     const word = words[index]
     if (word === undefined) return null
     const found = haystack.indexOf(word.text.toLocaleLowerCase(), cursor)
-    if (found === -1) return null
+    if (found === -1) {
+      if (index === target) return null
+      continue
+    }
     if (index === target) return [found, found + word.text.length]
     cursor = found + word.text.length
   }

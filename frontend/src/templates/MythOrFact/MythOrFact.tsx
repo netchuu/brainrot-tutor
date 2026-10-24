@@ -52,7 +52,7 @@ export function MythOrFact({ scene, timeMs, history }: TemplateProps) {
           )}
         </div>
       )}
-      <ReactionSticker scene={scene} timeMs={timeMs} />
+      <ReactionSticker scene={scene} timeMs={timeMs} position="top-[46cqh] left-[4cqw]" />
       <div className="absolute inset-x-[4cqw] top-[58cqh] flex min-h-[14cqh] items-center justify-center">
         <Caption words={scene.words} highlight={scene.highlight} timeMs={timeMs} />
       </div>

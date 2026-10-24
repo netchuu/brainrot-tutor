@@ -27,6 +27,18 @@ describe('claimPhase', () => {
     expect(claimPhase(reveal, [intro, claim, guess])).toEqual({ kind: 'reveal', claim, verdict: 'myth' })
   })
 
+  it('reveals on the teacher line after the guess even if the model repeats the verdict there', () => {
+    const repeated = { ...reveal, verdict: 'myth' as const }
+    expect(claimPhase(repeated, [intro, claim, guess])).toEqual({ kind: 'reveal', claim, verdict: 'myth' })
+    expect(claimPhase(explain, [intro, claim, guess, repeated])).toEqual({ kind: 'reveal', claim, verdict: 'myth' })
+  })
+
+  it('treats a second teacher verdict line before any guess as a new claim', () => {
+    const second = line('e9s6', 'teacher', 'fact', 'ЭБУ можно перепрошить.')
+    expect(claimPhase(second, [intro, claim])).toEqual({ kind: 'claim', claim: second })
+    expect(claimPhase(guess, [intro, claim, second])).toEqual({ kind: 'guess', claim: second })
+  })
+
   it('keeps the stamp for the explanation after the reveal and resets on the next claim', () => {
     expect(claimPhase(explain, [intro, claim, guess, reveal])).toEqual({ kind: 'reveal', claim, verdict: 'myth' })
     const next = line('e9s5', 'teacher', 'fact', 'ЭБУ можно перепрошить.')

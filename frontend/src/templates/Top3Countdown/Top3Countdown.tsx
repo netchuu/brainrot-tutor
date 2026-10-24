@@ -37,7 +37,7 @@ export function Top3Countdown({ scene, timeMs, history }: TemplateProps) {
       >
         <PictureCard scene={scene} className="aspect-square w-full" />
       </div>
-      <ReactionSticker scene={scene} timeMs={timeMs} />
+      <ReactionSticker scene={scene} timeMs={timeMs} position="top-[44cqh] right-[4cqw]" />
       <div className="absolute inset-x-[4cqw] top-[60cqh] flex min-h-[14cqh] items-center justify-center">
         <Caption words={scene.words} highlight={scene.highlight} timeMs={timeMs} />
       </div>
